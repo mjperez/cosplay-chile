@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, ConMarcaDeTiempo, nuevo_uuid
 
-TIPOS_PROVEEDOR = ("cosmaker", "sastre", "fotografo", "tienda", "otro")
+TIPOS_PROVEEDOR = ("cosmaker", "sastre", "fotografo", "tienda", "organizador", "otro")
 TIPOS_TIENDA = ("telas", "insumos", "pelucas", "impresion_3d", "otro")
 PLATAFORMAS = ("facebook", "discord", "instagram", "whatsapp", "foro", "otro")
 
@@ -26,7 +26,9 @@ class Proveedor(Base, ConMarcaDeTiempo):
         nullable=False,
         default="cosmaker",
     )
-    region: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    # Opcional a propósito: no todas las cuentas de la comunidad declaran su
+    # región, y el directorio debe poder mostrar ese hueco en vez de inventarlo.
+    region: Mapped[str | None] = mapped_column(String(80), index=True)
     sitio_web: Mapped[str | None] = mapped_column(String(500))
     contacto: Mapped[str | None] = mapped_column(String(200))
     descripcion: Mapped[str | None] = mapped_column(Text)

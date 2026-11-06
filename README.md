@@ -74,6 +74,24 @@ uvicorn app.main:app --reload
 | `GET /api/v1/auth/me` | datos del usuario del token |
 | `GET /api/v1/privacidad` | versión vigente de la política |
 | `GET /api/v1/admin/usuarios` | listado de cuentas (solo administrador) |
+| `GET /api/v1/proveedores` | directorio con filtros y paginación |
+| `GET /api/v1/proveedores/opciones` | regiones y tipos con fichas cargadas |
+
+## Datos semilla
+
+```bash
+python -m app.seed.proveedores
+```
+
+Carga las 20 fichas del directorio. Es idempotente. El origen de cada ficha
+está documentado en `app/seed/proveedores.py`: salen del levantamiento de
+requerimientos, no de una lista inventada. Solo se guarda lo que la cuenta
+publica abiertamente (nombre comercial, tipo, región declarada, usuario y
+sitio web); no hay correos ni teléfonos.
+
+Siete fichas declaran región (Metropolitana, Valparaíso, Coquimbo y Arica y
+Parinacota). Las otras trece quedan con región nula porque la cuenta no la
+publica: el directorio muestra «región no declarada» en lugar de suponerla.
 
 ## Frontend
 
