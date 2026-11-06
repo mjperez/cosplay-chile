@@ -3,8 +3,10 @@
 Backend de la plataforma de contenidos, directorio y comunidad para el cosplay
 chileno. Proyecto de TI3043, Ingeniería de Software, INACAP.
 
-**Estado:** US-01 (infraestructura) y US-04a (registro, login, roles, hash y
-JWT) implementadas y verificadas contra la base real. 59 pruebas en verde.
+**Estado:** US-01 (infraestructura), US-04a (registro, login, roles, hash y
+JWT), US-03 (sistema de diseño, lado Tailwind) y US-02 (landing y navegación)
+implementadas y verificadas contra la base real. 59 pruebas de backend en verde,
+lint y compilación del frontend sin advertencias.
 
 ---
 
@@ -72,6 +74,27 @@ uvicorn app.main:app --reload
 | `GET /api/v1/auth/me` | datos del usuario del token |
 | `GET /api/v1/privacidad` | versión vigente de la política |
 | `GET /api/v1/admin/usuarios` | listado de cuentas (solo administrador) |
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Queda en http://localhost:5173. El `vite.config.ts` redirige `/api` y `/health`
+al backend en el puerto 8000, así que en desarrollo no hace falta configurar
+CORS ni variables.
+
+| Script | Qué hace |
+|---|---|
+| `npm run dev` | servidor de desarrollo con recarga en caliente |
+| `npm run build` | compila TypeScript y genera `dist/` |
+| `npm run lint` | oxlint |
+| `npm run preview` | sirve `dist/` para probar la compilación |
+
+Páginas implementadas: inicio, registro, ingreso, política de privacidad y 404.
 
 ## Pruebas
 

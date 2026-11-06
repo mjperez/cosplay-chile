@@ -73,6 +73,47 @@ ti3043-cosplay-chile/
     └── exp/                         apuntes de exploración, no es código del producto
 ```
 
+## Frontend
+
+```
+frontend/
+├── index.html                     documento raíz, lang="es-CL"
+├── vite.config.ts                 plugin de Tailwind y proxy hacia el backend
+├── .env.example
+└── src/
+    ├── main.tsx                   monta React, el router y el proveedor de sesión
+    ├── App.tsx                    tabla de rutas
+    ├── index.css                  tokens del sistema de diseño (@theme)
+    ├── lib/
+    │   ├── api.ts                 cliente HTTP y tipos del backend
+    │   ├── auth.tsx               ProveedorAuth (solo el componente)
+    │   └── contextoAuth.ts        contexto y hook useAuth
+    ├── components/
+    │   ├── ui/
+    │   │   ├── Boton.tsx          variantes primario, secundario y fantasma
+    │   │   ├── Campo.tsx          etiqueta, ayuda y error accesibles
+    │   │   ├── Tarjeta.tsx
+    │   │   └── Etiqueta.tsx       badge
+    │   ├── layout/
+    │   │   ├── Disposicion.tsx    armazón con enlace de salto
+    │   │   ├── Encabezado.tsx     navegación y sesión
+    │   │   └── Pie.tsx
+    │   └── home/
+    │       ├── Portada.tsx
+    │       ├── Modulos.tsx
+    │       └── Pasos.tsx
+    └── pages/
+        ├── InicioPagina.tsx
+        ├── RegistroPagina.tsx
+        ├── IngresarPagina.tsx
+        ├── PrivacidadPagina.tsx
+        └── NoEncontradaPagina.tsx
+```
+
+Los tokens viven en `src/index.css`, en el bloque `@theme` de Tailwind 4. Un
+componente no escribe colores hexadecimales sueltos: si hace falta un color
+nuevo, se declara ahí y se usa por nombre.
+
 ## Responsabilidad de cada capa
 
 | Capa | Qué hace | Qué no hace |

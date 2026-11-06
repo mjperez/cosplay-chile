@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Tokens del sistema de diseño (US-03)
+   --------------------------------------------------------------------------
+   Todo color, tipografía y radio que usa la interfaz sale de aquí. Un
+   componente no debe escribir un valor hexadecimal suelto: si hace falta un
+   color nuevo, se declara como token en este bloque.
+
+   Los contrastes están calculados contra blanco (#ffffff) para texto normal,
+   que es el mínimo AA de 4,5:1.
+   ========================================================================== */
+
+@theme {
+  /* Marca: violeta. 600 sobre blanco da 6,9:1 */
+  --color-marca-50: #f5f3ff;
+  --color-marca-100: #ede9fe;
+  --color-marca-200: #ddd6fe;
+  --color-marca-300: #c4b5fd;
+  --color-marca-400: #a78bfa;
+  --color-marca-500: #8b5cf6;
+  --color-marca-600: #6d28d9;
+  --color-marca-700: #5b21b6;
+  --color-marca-800: #4c1d95;
+  --color-marca-900: #2e1065;
+
+  /* Acento: ámbar. 700 sobre blanco da 5,0:1; se usa en texto, no 600 */
+  --color-acento-50: #fffbeb;
+  --color-acento-100: #fef3c7;
+  --color-acento-300: #fcd34d;
+  --color-acento-500: #f59e0b;
+  --color-acento-600: #d97706;
+  --color-acento-700: #b45309;
+
+  /* Neutros con tinte cálido. Tinta 900 sobre blanco da 15,8:1 */
+  --color-tinta-50: #fafaf9;
+  --color-tinta-100: #f5f5f4;
+  --color-tinta-200: #e7e5e4;
+  --color-tinta-300: #d6d3d1;
+  --color-tinta-400: #a8a29e;
+  --color-tinta-500: #78716c;
+  --color-tinta-600: #57534e;
+  --color-tinta-700: #44403c;
+  --color-tinta-800: #292524;
+  --color-tinta-900: #1c1917;
+
+  /* Semánticos */
+  --color-exito-600: #15803d;
+  --color-error-600: #b91c1c;
+  --color-error-50: #fef2f2;
+
+  /* Tipografía */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Radios */
+  --radius-tarjeta: 0.875rem;
+  --radius-control: 0.5rem;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-tinta-50 text-tinta-900 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Foco siempre visible y con contraste. Nunca se quita el outline sin
+     reemplazarlo: es requisito del criterio de accesibilidad de US-03. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-marca-600;
+  }
+
+  /* Respeta a quien pidió menos movimiento en su sistema operativo. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Enlace de salto para lectores de pantalla y navegación por teclado. */
+  .saltar-al-contenido {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50
+           focus:rounded-control focus:bg-marca-700 focus:px-4 focus:py-2
+           focus:text-sm focus:font-semibold focus:text-white;
+  }
+}

@@ -2,8 +2,10 @@ __pycache__/
 *.py[cod]
 .venv/
 .env
+.env.local
 node_modules/
 dist/
+.capturas/
 .mcp-auth/
 .qodo/
 .vscode/
