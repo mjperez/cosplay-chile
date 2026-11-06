@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { DirectorioPagina } from './pages/DirectorioPagina'
 import { InicioPagina } from './pages/InicioPagina'
 import { IngresarPagina } from './pages/IngresarPagina'
 import { NoEncontradaPagina } from './pages/NoEncontradaPagina'
@@ -10,6 +11,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<InicioPagina />} />
+      <Route path="/directorio" element={<DirectorioPagina />} />
       <Route path="/ingresar" element={<IngresarPagina />} />
       <Route path="/registro" element={<RegistroPagina />} />
       <Route path="/privacidad" element={<PrivacidadPagina />} />

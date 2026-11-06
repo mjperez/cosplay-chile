@@ -5,15 +5,16 @@ import { useAuth } from '../../lib/contextoAuth'
 import { Boton } from '../ui/Boton'
 
 /**
- * Módulos que todavía no tienen pantalla. Se muestran como texto con la marca
- * «pronto» en lugar de enlaces: un enlace que lleva a un 404 es peor que un
- * enlace que no existe, y T-02.3 pide verificar que no haya enlaces roscas.
+ * Módulos de la plataforma. Los que tienen `to` ya existen; los demás se
+ * muestran como texto con la marca «pronto» en lugar de enlaces: un enlace que
+ * lleva a un 404 es peor que un enlace que no existe, y T-02.3 pide verificar
+ * que no haya enlaces roscas.
  */
-const MODULOS = [
-  { nombre: 'Directorio', pronto: true },
-  { nombre: 'Contenidos', pronto: true },
-  { nombre: 'Eventos', pronto: true },
-  { nombre: 'Comunidad', pronto: true },
+const MODULOS: { nombre: string; to?: string }[] = [
+  { nombre: 'Directorio', to: '/directorio' },
+  { nombre: 'Contenidos' },
+  { nombre: 'Eventos' },
+  { nombre: 'Comunidad' },
 ]
 
 export function Encabezado() {
@@ -57,19 +58,37 @@ export function Encabezado() {
                 Inicio
               </NavLink>
             </li>
-            {MODULOS.map((modulo) => (
-              <li key={modulo.nombre}>
-                <span
-                  aria-disabled="true"
-                  className="flex cursor-not-allowed items-center gap-1.5 rounded-control px-3 py-2 text-sm font-medium text-tinta-400"
-                >
-                  {modulo.nombre}
-                  <span className="rounded-full bg-tinta-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-tinta-500">
-                    pronto
+            {MODULOS.map((modulo) =>
+              modulo.to ? (
+                <li key={modulo.nombre}>
+                  <NavLink
+                    to={modulo.to}
+                    className={({ isActive }) =>
+                      [
+                        'rounded-control px-3 py-2 text-sm font-medium',
+                        isActive
+                          ? 'bg-marca-50 text-marca-800'
+                          : 'text-tinta-700 hover:bg-tinta-100',
+                      ].join(' ')
+                    }
+                  >
+                    {modulo.nombre}
+                  </NavLink>
+                </li>
+              ) : (
+                <li key={modulo.nombre}>
+                  <span
+                    aria-disabled="true"
+                    className="flex cursor-not-allowed items-center gap-1.5 rounded-control px-3 py-2 text-sm font-medium text-tinta-400"
+                  >
+                    {modulo.nombre}
+                    <span className="rounded-full bg-tinta-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-tinta-500">
+                      pronto
+                    </span>
                   </span>
-                </span>
-              </li>
-            ))}
+                </li>
+              ),
+            )}
           </ul>
         </nav>
 
@@ -126,19 +145,31 @@ export function Encabezado() {
                   Inicio
                 </NavLink>
               </li>
-              {MODULOS.map((modulo) => (
-                <li key={modulo.nombre}>
-                  <span
-                    aria-disabled="true"
-                    className="flex cursor-not-allowed items-center gap-2 rounded-control px-3 py-2 text-sm text-tinta-400"
-                  >
-                    {modulo.nombre}
-                    <span className="rounded-full bg-tinta-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-tinta-500">
-                      pronto
+              {MODULOS.map((modulo) =>
+                modulo.to ? (
+                  <li key={modulo.nombre}>
+                    <NavLink
+                      to={modulo.to}
+                      onClick={() => setAbierto(false)}
+                      className="block rounded-control px-3 py-2 text-sm font-medium text-tinta-700 hover:bg-tinta-100"
+                    >
+                      {modulo.nombre}
+                    </NavLink>
+                  </li>
+                ) : (
+                  <li key={modulo.nombre}>
+                    <span
+                      aria-disabled="true"
+                      className="flex cursor-not-allowed items-center gap-2 rounded-control px-3 py-2 text-sm text-tinta-400"
+                    >
+                      {modulo.nombre}
+                      <span className="rounded-full bg-tinta-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-tinta-500">
+                        pronto
+                      </span>
                     </span>
-                  </span>
-                </li>
-              ))}
+                  </li>
+                ),
+              )}
               <li className="mt-2 border-t border-tinta-200 pt-2">
                 {usuario ? (
                   <button

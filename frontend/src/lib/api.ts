@@ -42,6 +42,37 @@ export interface PoliticaPrivacidad {
   texto: string
 }
 
+export type TipoProveedor =
+  | 'cosmaker'
+  | 'sastre'
+  | 'fotografo'
+  | 'tienda'
+  | 'organizador'
+  | 'otro'
+
+export interface Proveedor {
+  id_proveedor: string
+  nombre: string
+  tipo: TipoProveedor
+  region: string | null
+  sitio_web: string | null
+  contacto: string | null
+  descripcion: string | null
+}
+
+export interface PaginaProveedores {
+  total: number
+  limite: number
+  desplazamiento: number
+  elementos: Proveedor[]
+}
+
+export interface OpcionesDirectorio {
+  regiones: string[]
+  tipos: string[]
+  hay_sin_region: boolean
+}
+
 export interface DatosRegistro {
   nombre: string
   correo: string
@@ -127,4 +158,19 @@ export const api = {
     }),
 
   yo: () => peticion<Usuario>('/api/v1/auth/me'),
+
+  /**
+   * El listado recibe la query ya armada.
+   *
+   * Así la página puede usarla como clave de efecto: la misma cadena produce
+   * la misma petición, sin comparar objetos que cambian de identidad en cada
+   * render.
+   */
+  proveedores: (query: string) =>
+    peticion<PaginaProveedores>(
+      `/api/v1/proveedores${query ? `?${query}` : ''}`,
+    ),
+
+  opcionesDirectorio: () =>
+    peticion<OpcionesDirectorio>('/api/v1/proveedores/opciones'),
 }

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import { Etiqueta } from '../ui/Etiqueta'
 import { Tarjeta } from '../ui/Tarjeta'
 
@@ -5,6 +7,8 @@ interface Modulo {
   nombre: string
   descripcion: string
   icono: React.ReactNode
+  /** Presente solo si el módulo ya tiene pantalla. */
+  to?: string
 }
 
 const MODULOS: Modulo[] = [
@@ -12,6 +16,7 @@ const MODULOS: Modulo[] = [
     nombre: 'Directorio de profesionales',
     descripcion:
       'Cosmakers, sastres, fotógrafos y tiendas, filtrados por región y especialidad. Con portafolio y contacto directo.',
+    to: '/directorio',
     icono: (
       <path
         d="M4 6h16M4 12h16M4 18h10"
@@ -85,11 +90,33 @@ export function Modulos() {
                   {modulo.icono}
                 </svg>
               </span>
-              <Etiqueta tono="neutro">Pronto</Etiqueta>
+              {modulo.to ? (
+                <Etiqueta tono="exito">Disponible</Etiqueta>
+              ) : (
+                <Etiqueta tono="neutro">Pronto</Etiqueta>
+              )}
             </div>
 
-            <h3 className="text-base font-semibold text-tinta-900">{modulo.nombre}</h3>
+            <h3 className="text-base font-semibold text-tinta-900">
+              {modulo.to ? (
+                <Link to={modulo.to} className="hover:text-marca-700 hover:underline">
+                  {modulo.nombre}
+                </Link>
+              ) : (
+                modulo.nombre
+              )}
+            </h3>
             <p className="text-sm leading-relaxed text-tinta-600">{modulo.descripcion}</p>
+
+            {modulo.to && (
+              <Link
+                to={modulo.to}
+                className="mt-auto text-sm font-semibold text-marca-700 hover:underline"
+              >
+                Ver el directorio
+                <span aria-hidden="true"> →</span>
+              </Link>
+            )}
           </Tarjeta>
         ))}
       </ul>
