@@ -1,4 +1,5 @@
 services:
+  # --- Backend ---------------------------------------------------------
   - type: web
     name: cosplay-chile-api
     runtime: python
@@ -25,3 +26,29 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      # URL pública del frontend. Sin esto, el navegador bloquea las peticiones
+      # por CORS en producción.
+      - key: CORS_ORIGINS
+        sync: false
+
+  # --- Frontend --------------------------------------------------------
+  # Sitio estático: Render compila con Vite y publica dist/. No ejecuta
+  # Python ni Node en producción, solo sirve archivos.
+  - type: web
+    name: cosplay-chile-web
+    runtime: static
+    rootDir: frontend
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # URL pública del backend, compilada dentro del bundle.
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # React Router maneja las rutas en el cliente. Sin esta reescritura,
+      # recargar /directorio devolvería 404 en el servidor.
+      - type: rewrite
+        source: /*
+        destination: /index.html

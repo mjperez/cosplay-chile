@@ -59,6 +59,20 @@ Revertir todo:
 alembic downgrade base
 ```
 
+### Nota sobre el proveedor de base de datos
+
+El informe de la asignatura describe el despliegue con **Neon**. La
+implementación corre sobre **Supabase**, porque el proyecto de Neon se dio de
+baja antes de la puesta en marcha.
+
+El cambio no afecta al diseño: ambos son PostgreSQL 17, el esquema no usa
+ninguna extensión específica de proveedor y la cadena de conexión se toma de
+`DATABASE_URL`. Cambiar de proveedor es cambiar una variable de entorno, sin
+tocar código ni migraciones.
+
+La nota queda aquí y no en el informe porque el informe ya está entregado. El
+repositorio es la fuente de verdad sobre lo que efectivamente corre.
+
 ## Ejecutar
 
 ```bash
