@@ -42,6 +42,11 @@ class Contenido(Base, ConMarcaDeTiempo):
     )
     titulo: Mapped[str] = mapped_column(String(200), nullable=False)
     resumen: Mapped[str | None] = mapped_column(Text)
+    # Cuerpo enriquecido en HTML saneado por el cliente. Se guarda como texto
+    # y no como JSON porque es un documento, no una estructura de datos.
+    cuerpo: Mapped[str | None] = mapped_column(Text)
+    imagenes: Mapped[list | None] = mapped_column(JSON)
+    video_url: Mapped[str | None] = mapped_column(String(500))
     nivel: Mapped[str] = mapped_column(
         Enum(*NIVELES, name="nivel_dificultad", native_enum=False),
         nullable=False,
@@ -66,7 +71,12 @@ class Contenido(Base, ConMarcaDeTiempo):
 
 
 class GuiaTutorial(Contenido):
-    """Guía paso a paso publicada por un usuario."""
+    """Guía paso a paso publicada por un usuario.
+
+    Además del contenido común, una guía documenta el personaje, las medidas,
+    las técnicas empleadas, el presupuesto declarado y las advertencias de
+    seguridad. Es lo que la distingue de un artículo en la vista pública.
+    """
 
     __tablename__ = "guia_tutorial"
 
@@ -75,6 +85,13 @@ class GuiaTutorial(Contenido):
     )
     pasos: Mapped[list | None] = mapped_column(JSON)
     materiales: Mapped[list | None] = mapped_column(JSON)
+    personaje: Mapped[str | None] = mapped_column(String(120))
+    # Lista de {parte, valor}: "pecho: 92 cm". Estructurada para poder
+    # comparar medidas entre guías, no como texto libre.
+    medidas: Mapped[list | None] = mapped_column(JSON)
+    tecnicas: Mapped[list | None] = mapped_column(JSON)
+    presupuesto: Mapped[str | None] = mapped_column(String(200))
+    seguridad: Mapped[str | None] = mapped_column(Text)
 
     __mapper_args__ = {"polymorphic_identity": "guia"}
 
