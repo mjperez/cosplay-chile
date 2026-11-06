@@ -83,15 +83,23 @@ uvicorn app.main:app --reload
 python -m app.seed.proveedores
 ```
 
-Carga las 20 fichas del directorio. Es idempotente. El origen de cada ficha
-está documentado en `app/seed/proveedores.py`: salen del levantamiento de
+Carga las 20 fichas del directorio. Es idempotente y correctiva: crea las que
+faltan y arregla las que cambiaron, sin duplicar. El origen de cada ficha está
+documentado en `app/seed/proveedores.py`: salen del levantamiento de
 requerimientos, no de una lista inventada. Solo se guarda lo que la cuenta
-publica abiertamente (nombre comercial, tipo, región declarada, usuario y
-sitio web); no hay correos ni teléfonos.
+publica abiertamente (nombre comercial, tipo, región cuando corresponde,
+usuario y sitio web); no hay correos ni teléfonos.
 
-Siete fichas declaran región (Metropolitana, Valparaíso, Coquimbo y Arica y
-Parinacota). Las otras trece quedan con región nula porque la cuenta no la
-publica: el directorio muestra «región no declarada» en lugar de suponerla.
+Once fichas declaran región: Metropolitana (7), Antofagasta, Valparaíso,
+Coquimbo y Arica y Parinacota. Las otras nueve quedan sin región por dos
+motivos distintos, ambos deliberados:
+
+- **Tres tiendas solo venden online** (MotorLaser, Tienda Deck, FukuBox), así
+  que no tienen una región de atención presencial que declarar.
+- **Cinco cosmakers y un sastre son personas naturales.** Publicar su ubicación
+  es un riesgo de doxxing y no aporta a la función del directorio, que es
+  encontrar un servicio. La región se publica para negocios con dirección
+  comercial, no para individuos.
 
 ## Frontend
 

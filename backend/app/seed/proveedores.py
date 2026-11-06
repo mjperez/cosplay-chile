@@ -9,27 +9,36 @@ una lista inventada:
   Apify (`apify/dataset_tiktok-scraper_*.json`), cuyo perfil público declara
   una actividad de proveedor: tienda, cosmaker, sastre u organizadora de
   eventos.
-- 2 tiendas nombradas por los propios usuarios en los comentarios de Instagram
-  (Yui Chan Store y Arte Pierrot) no se incluyen: la mención no trae región ni
-  tipo, y no hay perfil que lo confirme.
+- Dos tiendas nombradas por los propios usuarios en los comentarios de
+  Instagram (Yui Chan Store y Arte Pierrot) no se incluyen: la mención no trae
+  región ni tipo, y no hay perfil que lo confirme.
+
+Regla de privacidad
+-------------------
+La región se publica solo cuando el negocio la expone como parte de su
+actividad comercial (dirección de local, alcance declarado, ciudad en el
+perfil). **Las personas naturales quedan sin región a propósito**, aunque su
+perfil permita deducirla: publicar la ubicación de un cosmaker o un sastre
+individual es un riesgo de doxxing y no aporta a la función del directorio,
+que es encontrar un servicio, no ubicar a una persona.
+
+Por eso las cinco fichas de cosmaker y la de sastrería no tienen región. No es
+un dato que falte: es un dato que no corresponde publicar.
 
 Qué se guarda y qué no
 ----------------------
 Solo lo que la cuenta publica abiertamente: nombre comercial, tipo de
-actividad, región cuando la declara, el usuario público y el sitio web de
-negocio. **No se guardan correos, teléfonos ni nombres de personas**: aparecen
-en varias biografías y no hacen falta para el directorio.
-
-La región queda nula cuando la cuenta no la declara. Dos casos
-(`Epic Animes`, `Hey Nana`) se deducen de la dirección comercial que publican
-en su propia biografía; el resto se deja sin dato antes que rellenarlo con una
-suposición.
+actividad, región cuando corresponde según la regla anterior, el usuario
+público y el sitio web de negocio. **No se guardan correos, teléfonos ni
+nombres de personas**: aparecen en varias biografías y no hacen falta para el
+directorio.
 
 Ejecución
 ---------
     python -m app.seed.proveedores
 
-Es idempotente: no duplica fichas que ya existen.
+Es idempotente y correctiva: crea las fichas que faltan y actualiza las que
+cambiaron, sin duplicar.
 """
 
 from __future__ import annotations
@@ -39,14 +48,18 @@ from sqlalchemy.orm import Session
 
 from app.models.directorio import Proveedor
 
+# Claves que puede tocar la carga. Las ausentes se normalizan a None para que
+# una corrección pueda borrar un valor anterior.
+CAMPOS = ("nombre", "tipo", "region", "contacto", "sitio_web", "descripcion")
+
 REGISTROS: list[dict] = [
     # --- Tiendas --------------------------------------------------------
     {
         "nombre": "Tienda Akiba-Kei",
         "tipo": "tienda",
-        "region": None,
+        "region": "Antofagasta",
         "contacto": "@tienda.akibakei",
-        "descripcion": "Tienda de artículos de anime con envíos a todo Chile, activa desde 2013.",
+        "descripcion": "Tienda de artículos de anime con locales en Antofagasta y Calama, y envíos a todo Chile desde 2013.",
     },
     {
         "nombre": "Epic Animes",
@@ -74,7 +87,7 @@ REGISTROS: list[dict] = [
         "tipo": "tienda",
         "region": None,
         "contacto": "@motorlaser_",
-        "descripcion": "Corte láser de artículos de anime y cultura geek. Venta online.",
+        "descripcion": "Corte láser de artículos de anime y cultura geek. Solo venta online.",
     },
     {
         "nombre": "Tienda Deck",
@@ -82,16 +95,17 @@ REGISTROS: list[dict] = [
         "region": None,
         "contacto": "@tiendadeck",
         "sitio_web": "https://tiendadeck.cl",
-        "descripcion": "Papelería, accesorios y artículos de colección.",
+        "descripcion": "Papelería, accesorios y artículos de colección. Solo venta online.",
     },
     {
         "nombre": "FukuBox",
         "tipo": "tienda",
         "region": None,
         "contacto": "@fukubox.cl",
-        "descripcion": "Servicio de compra y envío de productos japoneses a Chile.",
+        "descripcion": "Servicio de compra por encargo (proxy) de productos japoneses. Opera desde Japón.",
     },
     # --- Cosmaker -------------------------------------------------------
+    # Sin región: personas naturales. Ver la regla de privacidad del encabezado.
     {
         "nombre": "Shar Cosss",
         "tipo": "cosmaker",
@@ -160,24 +174,24 @@ REGISTROS: list[dict] = [
     {
         "nombre": "Fiesta Otaku",
         "tipo": "organizador",
-        "region": None,
+        "region": "Metropolitana",
         "contacto": "@fiestaotaku.cl",
-        "descripcion": "Eventos de cultura otaku en Chile.",
+        "descripcion": "Eventos de cultura otaku en Santiago.",
     },
     {
         "nombre": "Feria Friki",
         "tipo": "organizador",
-        "region": None,
+        "region": "Metropolitana",
         "contacto": "@feriafriki",
         "sitio_web": "https://www.feriafriki.cl",
-        "descripcion": "Feria de cultura friki con sitio web propio.",
+        "descripcion": "Feria de cultura friki en Santiago, con sitio web propio.",
     },
     {
         "nombre": "Otaku Dance",
         "tipo": "organizador",
-        "region": None,
+        "region": "Metropolitana",
         "contacto": "@otakudance",
-        "descripcion": "Fiestas de música y cultura otaku.",
+        "descripcion": "Fiestas de música y cultura otaku en Santiago.",
     },
     # --- Otros oficios --------------------------------------------------
     {
@@ -190,38 +204,53 @@ REGISTROS: list[dict] = [
 ]
 
 
-def cargar(sesion: Session) -> tuple[int, int]:
-    """Inserta las fichas que falten. Devuelve (creadas, ya existentes)."""
-    creadas = 0
-    existentes = 0
+def _normalizar(registro: dict) -> dict:
+    return {campo: registro.get(campo) for campo in CAMPOS}
 
-    for registro in REGISTROS:
-        ya_esta = sesion.scalar(
+
+def cargar(sesion: Session) -> tuple[int, int]:
+    """Crea las fichas que faltan y corrige las que cambiaron.
+
+    Devuelve (creadas, actualizadas).
+    """
+    creadas = 0
+    actualizadas = 0
+
+    for bruto in REGISTROS:
+        datos = _normalizar(bruto)
+        existente = sesion.scalar(
             select(Proveedor).where(
-                Proveedor.nombre == registro["nombre"],
-                Proveedor.contacto == registro["contacto"],
+                Proveedor.nombre == datos["nombre"],
+                Proveedor.contacto == datos["contacto"],
             )
         )
-        if ya_esta is not None:
-            existentes += 1
+
+        if existente is None:
+            sesion.add(Proveedor(**datos))
+            creadas += 1
             continue
 
-        sesion.add(Proveedor(**registro))
-        creadas += 1
+        cambiado = False
+        for campo, valor in datos.items():
+            if getattr(existente, campo) != valor:
+                setattr(existente, campo, valor)
+                cambiado = True
+        if cambiado:
+            actualizadas += 1
 
     sesion.flush()
-    return creadas, existentes
+    return creadas, actualizadas
 
 
 def main() -> None:
     from app.core.database import get_session_manager
 
     with get_session_manager().session() as sesion:
-        creadas, existentes = cargar(sesion)
+        creadas, actualizadas = cargar(sesion)
 
-    print(f"fichas creadas: {creadas}")
-    print(f"ya existian:    {existentes}")
-    print(f"total definido: {len(REGISTROS)}")
+    print(f"fichas creadas:     {creadas}")
+    print(f"fichas actualizadas: {actualizadas}")
+    print(f"total definido:     {len(REGISTROS)}")
 
 
 if __name__ == "__main__":

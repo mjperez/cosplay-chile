@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from sqlalchemy import update
+
 from app.core.database import get_session_manager
+from app.models.directorio import Proveedor
 from app.seed import proveedores as semilla
 
 RUTA = "/api/v1/proveedores"
@@ -75,11 +78,16 @@ def test_busqueda_por_texto_libre(cliente):
 
 
 def test_filtra_fichas_sin_region_declarada(cliente):
+    """Nueve sin región: tres tiendas online y seis personas naturales.
+
+    Las personas quedan sin región a propósito (riesgo de doxxing), no por
+    falta de dato. Ver la regla de privacidad en `app/seed/proveedores.py`.
+    """
     _cargar_semilla()
 
     cuerpo = cliente.get(RUTA, params={"sin_region": True, "limite": 100}).json()
 
-    assert cuerpo["total"] == 13
+    assert cuerpo["total"] == 9
     assert all(p["region"] is None for p in cuerpo["elementos"])
 
 
@@ -108,8 +116,25 @@ def test_opciones_devuelve_las_regiones_cargadas(cliente):
 
     assert "Metropolitana" in cuerpo["regiones"]
     assert "Valparaíso" in cuerpo["regiones"]
+    assert "Antofagasta" in cuerpo["regiones"]
     assert cuerpo["hay_sin_region"] is True
     assert "organizador" in cuerpo["tipos"]
+
+
+def test_la_semilla_corrige_datos_sin_duplicar(cliente):
+    """Volver a cargar no duplica, y sí arregla lo que alguien haya cambiado."""
+    _cargar_semilla()
+
+    with get_session_manager().session() as sesion:
+        sesion.execute(
+            update(Proveedor).where(Proveedor.nombre == "Komori Store").values(region=None)
+        )
+
+    _cargar_semilla()
+
+    cuerpo = cliente.get(RUTA, params={"q": "Komori"}).json()
+    assert cuerpo["total"] == 1
+    assert cuerpo["elementos"][0]["region"] == "Metropolitana"
 
 
 def test_el_directorio_es_publico(cliente):
