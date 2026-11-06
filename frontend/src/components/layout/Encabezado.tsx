@@ -12,7 +12,7 @@ import { Boton } from '../ui/Boton'
  */
 const MODULOS: { nombre: string; to?: string }[] = [
   { nombre: 'Directorio', to: '/directorio' },
-  { nombre: 'Contenidos' },
+  { nombre: 'Contenidos', to: '/contenido' },
   { nombre: 'Eventos' },
   { nombre: 'Comunidad' },
 ]

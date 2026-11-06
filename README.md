@@ -90,6 +90,11 @@ uvicorn app.main:app --reload
 | `GET /api/v1/admin/usuarios` | listado de cuentas (solo administrador) |
 | `GET /api/v1/proveedores` | directorio con filtros y paginación |
 | `GET /api/v1/proveedores/opciones` | regiones y tipos con fichas cargadas |
+| `GET /api/v1/contenido` | contenido publicado (guías, entrevistas, artículos) |
+| `GET /api/v1/contenido/{id}` | detalle de un contenido publicado |
+| `POST /api/v1/contenido` | crear contenido en borrador (requiere sesión) |
+| `POST /api/v1/contenido/{id}/publicar` | publicar un borrador (solo administrador) |
+| `GET /api/v1/admin/contenido` | bandeja editorial con todos los estados |
 
 ## Datos semilla
 

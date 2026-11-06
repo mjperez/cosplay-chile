@@ -73,6 +73,51 @@ export interface OpcionesDirectorio {
   hay_sin_region: boolean
 }
 
+export type TipoContenido = 'guia' | 'entrevista' | 'articulo'
+
+export interface Medida {
+  parte: string
+  valor: string
+}
+
+export interface Contenido {
+  id_contenido: string
+  tipo: TipoContenido
+  titulo: string
+  resumen: string | null
+  nivel: 'basico' | 'intermedio' | 'avanzado'
+  estado: 'pendiente' | 'publicado' | 'rechazado'
+  cuerpo: string | null
+  imagenes: string[] | null
+  video_url: string | null
+  id_categoria: string | null
+  fecha_publicacion: string | null
+  creado_en: string
+  personaje: string | null
+  medidas: Medida[] | null
+  tecnicas: string[] | null
+  presupuesto: string | null
+  seguridad: string | null
+  pasos: string[] | null
+  materiales: string[] | null
+  preguntas: string[] | null
+  respuestas: string[] | null
+  enlaces: string[] | null
+}
+
+export interface PaginaContenido {
+  total: number
+  limite: number
+  desplazamiento: number
+  elementos: Contenido[]
+}
+
+export interface Categoria {
+  id_categoria: string
+  nombre: string
+  descripcion: string | null
+}
+
 export interface DatosRegistro {
   nombre: string
   correo: string
@@ -173,4 +218,20 @@ export const api = {
 
   opcionesDirectorio: () =>
     peticion<OpcionesDirectorio>('/api/v1/proveedores/opciones'),
+
+  contenido: (query: string) =>
+    peticion<PaginaContenido>(`/api/v1/contenido${query ? `?${query}` : ''}`),
+
+  contenidoPorId: (id: string) => peticion<Contenido>(`/api/v1/contenido/${id}`),
+
+  categorias: () => peticion<Categoria[]>('/api/v1/contenido/categorias'),
+
+  crearContenido: (datos: Record<string, unknown>) =>
+    peticion<Contenido>('/api/v1/contenido', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+
+  publicarContenido: (id: string) =>
+    peticion<Contenido>(`/api/v1/contenido/${id}/publicar`, { method: 'POST' }),
 }
