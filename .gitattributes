@@ -1,0 +1,8 @@
+# Normaliza los finales de línea en el repositorio.
+# En Windows (core.autocrlf=true) sin este archivo, git rechaza agregar
+# archivos con LF porque los convertiría a CRLF al hacer checkout.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
