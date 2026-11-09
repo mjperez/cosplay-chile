@@ -1,4 +1,4 @@
-# Cosplay Chile — API
+# Cosplay Chile 
 
 Backend de la plataforma de contenidos, directorio y comunidad para el cosplay
 chileno. Proyecto de TI3043, Ingeniería de Software, INACAP.
