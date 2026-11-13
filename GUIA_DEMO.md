@@ -70,6 +70,10 @@ y **http://localhost:8000/docs**.
 Útil si no consigues un PC: la URL pública se abre en cualquier navegador.
 Necesitas la cadena `DATABASE_URL` de Supabase en el panel de Render.
 
+Comprobado tras la fusión: **https://cosplay-chile-web.onrender.com** y
+**https://cosplay-chile-api.onrender.com/health** responden 200 con la versión
+nueva, y el bundle del frontend ya incluye el panel de administración.
+
 1. Los cambios ya están en `main`. Render despliega **solo desde `main`**;
    si te quedas en `dev` o en una rama de trabajo, no verás los cambios en la
    URL. Si el despliegue no se disparó, usa **Manual Deploy → Deploy latest
@@ -85,13 +89,18 @@ Necesitas la cadena `DATABASE_URL` de Supabase en el panel de Render.
    | API | `DATABASE_URL` | pooler de Supabase con `sslmode=require` |
    | API | `JWT_SECRET` | la genera Render |
    | API | `CORS_ORIGINS` | URL pública del **frontend** |
-   | API | `DEMO_SEED` | `1` para que carguen las cuentas de ejemplo |
+   | API | `DEMO_SEED` | `1` (ya viene por defecto en `render.yaml`) |
    | Web | `VITE_API_URL` | URL pública del **backend** |
 
    Orden importante: crea primero el backend para obtener su URL, ponla en
    `VITE_API_URL`, crea el frontend y copia su URL en `CORS_ORIGINS`. Sin
    `CORS_ORIGINS` el navegador bloquea todas las peticiones.
-4. Tras la demo, **quita `DEMO_SEED`** y vuelve a desplegar. Las filas ya
+4. **No hace falta configurar `DEMO_SEED` a mano**: el `startCommand` lo
+   deja en `1` si la variable no existe, así que las cuentas de ejemplo se
+   crean en el arranque aunque el servicio de Render sea antiguo. Si el login
+   `demo@cosplay.cl` todavía da 401, haz **Manual Deploy → Deploy latest
+   commit** en `cosplay-chile-api` para que tome el `render.yaml` nuevo.
+5. Tras la demo, **pon `DEMO_SEED=0`** y vuelve a desplegar. Las filas ya
    creadas no se borran solas: elimina las tres cuentas demo desde la base o
    cambia sus contraseñas.
 
@@ -183,6 +192,7 @@ curl -X POST http://localhost:8000/api/v1/admin/eventos \
 - [ ] Puedes iniciar sesión con `cosplayer@cosplay.cl` / `Demo2026!`.
 - [ ] `/eventos` muestra 6 eventos y `/foro` muestra 5 temas.
 - [ ] Entrando como `demo@cosplay.cl` se ve **Administración** y `/admin` carga el resumen.
+- [ ] En Render, el login `demo@cosplay.cl` / `Demo2026!` responde 200 (si da 401, redesplegar la API).
 - [ ] Si usas Render, abriste la URL 5 minutos antes para evitar el arranque en frío.
 - [ ] Llevas esta guía abierta en el móvil por si falla la red de la sala (la opción A no depende de internet una vez instaladas las dependencias).
 
@@ -210,13 +220,14 @@ Tres formas, de menos a más drástica:
 | Forma | Cuándo usarla | Cómo |
 |---|---|---|
 | **Rollback en Render** | Solo quieres volver a la versión anterior ya desplegada, sin tocar Git | Panel de Render → servicio → pestaña **Deploys** → elegir el deploy anterior → **Redeploy**. Es instantáneo y no cambia el repo |
-| **`git revert`** (recomendado en Git) | Quieres que `main` quede limpio y que Render vuelva a desplegar solo | `git checkout main && git revert -m 1 <sha-del-merge> && git push origin main` |
+| **`git revert`** (recomendado en Git) | Quieres que `main` quede limpio y que Render vuelva a desplegar solo | `git checkout main && git revert -m 1 94f8b2c0 && git push origin main` |
 | **Restaurar el respaldo** | Quieres exactamente el estado previo, sin historial del intento | `git checkout main && git reset --hard backup-pre-demo-admin && git push --force-with-lease origin main` |
 
 > Evita `reset --hard` + push forzado si alguien más usa el repo: reescribe el
 > historial compartido. Para una demo, `git revert` o el rollback de Render
-> alcanzan. El respaldo queda como red de seguridad local; si quieres tenerlo
-> también en GitHub, súbelo con `git push origin backup/pre-demo-admin`.
+> alcanzan. Tanto la rama `backup/pre-demo-admin` como la etiqueta
+> `backup-pre-demo-admin` **ya están publicadas en GitHub**, así que el respaldo
+> sobrevive aunque borres el clon local o trabajes solo desde el móvil.
 
 Recuerda que las **migraciones no se revierten** con `git revert`: este cambio
 no agregó ninguna migración, así que la base sigue siendo compatible con ambas

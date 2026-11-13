@@ -221,8 +221,10 @@ reales de login, inscripción, foro y perfil.
 | `cosplay-chile-web` | static | `frontend/dist`, con rewrite `/* -> /index.html` para React Router |
 
 El `startCommand` del backend aplica migraciones y ejecuta
-`app.seed.datos_base` en cada arranque. Si `DEMO_SEED=1`, además corre
-`app.seed.demo` para la demo en clases.
+`app.seed.datos_base` en cada arranque. Después corre `app.seed.demo` **por
+defecto** (`DEMO_SEED=1`), de modo que la entrega en clases funciona sin
+configurar nada en el panel. Al terminar la demo, cambia `DEMO_SEED` a `0`,
+redespliega y borra las cuentas de ejemplo: sus contraseñas son públicas.
 
 Variables que se cargan a mano en el panel:
 
@@ -232,7 +234,7 @@ Variables que se cargan a mano en el panel:
 | `JWT_SECRET` | API | la genera Render (`generateValue: true`) |
 | `CORS_ORIGINS` | API | URL pública del frontend, sin barra final |
 | `VITE_API_URL` | Web | URL pública del backend, sin barra final |
-| `DEMO_SEED` | API | `1` solo para la demo; quitar después |
+| `DEMO_SEED` | API | `1` por defecto para la demo; poner `0` después |
 
 `CORS_ORIGINS` y `VITE_API_URL` se necesitan entre sí: primero crea el backend
 para obtener su URL, luego el frontend, y por último vuelve al backend a

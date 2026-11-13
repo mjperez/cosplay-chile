@@ -11,10 +11,13 @@ services:
     # Las semillas van después de las migraciones y son idempotentes: cargan
     # las 5 categorías y las 20 fichas reales del directorio. Sin ellas el
     # directorio sale vacío y el editor de contenido no puede crear borradores.
-    # DEMO_SEED=1 es optativo y solo para exponer la plataforma en clases:
-    # crea cuentas y contenido de ejemplo. Quitar la variable y redesplegar
-    # deja de ejecutarlo; las filas ya creadas hay que borrarlas a mano.
-    startCommand: alembic upgrade head && python -m app.seed.datos_base && if [ "$DEMO_SEED" = "1" ]; then python -m app.seed.demo; fi && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # La semilla demo corre POR DEFECTO para que la entrega en clases funcione
+    # sin configurar nada en el panel: crea las cuentas y el contenido de
+    # ejemplo. Es insegura a propósito. Después de la demo hay que poner
+    # DEMO_SEED=0, redesplegar y borrar esas cuentas de la base.
+    # El export con valor por defecto cubre el caso de un servicio ya creado
+    # al que Render todavía no le inyectó la variable del blueprint.
+    startCommand: alembic upgrade head && python -m app.seed.datos_base && export DEMO_SEED="${DEMO_SEED:-1}" && if [ "$DEMO_SEED" = "1" ]; then python -m app.seed.demo; fi && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -27,6 +30,10 @@ services:
         value: 60
       - key: BCRYPT_ROUNDS
         value: 12
+      # 1 = cargar cuentas y datos de demo en cada arranque (entrega en clases).
+      # Cambiar a 0 y redesplegar cuando la demo haya terminado.
+      - key: DEMO_SEED
+        value: "1"
       # Se cargan a mano en el panel: el repositorio no contiene credenciales.
       - key: DATABASE_URL
         sync: false
