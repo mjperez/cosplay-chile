@@ -4,17 +4,14 @@ import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../lib/contextoAuth'
 import { Boton } from '../ui/Boton'
 
-/**
- * Módulos de la plataforma. Los que tienen `to` ya existen; los demás se
- * muestran como texto con la marca «pronto» en lugar de enlaces: un enlace que
- * lleva a un 404 es peor que un enlace que no existe, y T-02.3 pide verificar
- * que no haya enlaces roscas.
- */
-const MODULOS: { nombre: string; to?: string }[] = [
+/** Módulos de la plataforma. Todos tienen pantalla implementada. */
+const MODULOS: { nombre: string; to: string }[] = [
   { nombre: 'Directorio', to: '/directorio' },
   { nombre: 'Contenidos', to: '/contenido' },
-  { nombre: 'Eventos' },
-  { nombre: 'Comunidad' },
+  { nombre: 'Eventos', to: '/eventos' },
+  { nombre: 'Foro', to: '/foro' },
+  { nombre: 'Desafíos', to: '/desafios' },
+  { nombre: 'Comunidad', to: '/comunidad' },
 ]
 
 export function Encabezado() {
@@ -37,18 +34,18 @@ export function Encabezado() {
           <span className="text-base">Cosplay Chile</span>
         </Link>
 
-        {/* El menú completo no cabe a 768 px: cinco módulos más el logo y los
-            botones de sesión suman más de 900 px. Por eso el corte es lg
-            (1024 px) y no md. */}
-        <nav aria-label="Navegación principal" className="hidden lg:block">
-          <ul className="flex items-center gap-1">
+        {/* Con siete módulos, el menú completo más el logo y los botones de
+            sesión supera los 1024 px. El corte es xl (1280 px); por debajo se
+            usa el menú móvil, que tiene exactamente las mismas rutas. */}
+        <nav aria-label="Navegación principal" className="hidden xl:block">
+          <ul className="flex items-center gap-0.5">
             <li>
               <NavLink
                 to="/"
                 end
                 className={({ isActive }) =>
                   [
-                    'rounded-control px-3 py-2 text-sm font-medium',
+                    'rounded-control px-2.5 py-2 text-sm font-medium',
                     isActive
                       ? 'bg-marca-50 text-marca-800'
                       : 'text-tinta-700 hover:bg-tinta-100',
@@ -58,43 +55,35 @@ export function Encabezado() {
                 Inicio
               </NavLink>
             </li>
-            {MODULOS.map((modulo) =>
-              modulo.to ? (
-                <li key={modulo.nombre}>
-                  <NavLink
-                    to={modulo.to}
-                    className={({ isActive }) =>
-                      [
-                        'rounded-control px-3 py-2 text-sm font-medium',
-                        isActive
-                          ? 'bg-marca-50 text-marca-800'
-                          : 'text-tinta-700 hover:bg-tinta-100',
-                      ].join(' ')
-                    }
-                  >
-                    {modulo.nombre}
-                  </NavLink>
-                </li>
-              ) : (
-                <li key={modulo.nombre}>
-                  <span
-                    aria-disabled="true"
-                    className="flex cursor-not-allowed items-center gap-1.5 rounded-control px-3 py-2 text-sm font-medium text-tinta-400"
-                  >
-                    {modulo.nombre}
-                    <span className="rounded-full bg-tinta-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-tinta-500">
-                      pronto
-                    </span>
-                  </span>
-                </li>
-              ),
-            )}
+            {MODULOS.map((modulo) => (
+              <li key={modulo.nombre}>
+                <NavLink
+                  to={modulo.to}
+                  className={({ isActive }) =>
+                    [
+                      'rounded-control px-2.5 py-2 text-sm font-medium',
+                      isActive
+                        ? 'bg-marca-50 text-marca-800'
+                        : 'text-tinta-700 hover:bg-tinta-100',
+                    ].join(' ')
+                  }
+                >
+                  {modulo.nombre}
+                </NavLink>
+              </li>
+            ))}
           </ul>
         </nav>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="hidden items-center gap-2 xl:flex">
           {usuario ? (
             <>
+              <Link
+                to="/perfil"
+                className="rounded-control px-2.5 py-2 text-sm font-medium text-tinta-700 hover:bg-tinta-100"
+              >
+                Mi perfil
+              </Link>
               <span className="text-sm text-tinta-600">
                 Hola, <strong className="font-semibold text-tinta-900">{usuario.nombre}</strong>
               </span>
@@ -122,7 +111,7 @@ export function Encabezado() {
 
         <button
           type="button"
-          className="rounded-control border border-tinta-300 px-3 py-2 text-sm font-medium lg:hidden"
+          className="rounded-control border border-tinta-300 px-3 py-2 text-sm font-medium xl:hidden"
           aria-expanded={abierto}
           aria-controls="menu-movil"
           onClick={() => setAbierto((valor) => !valor)}
@@ -132,7 +121,7 @@ export function Encabezado() {
       </div>
 
       {abierto && (
-        <div id="menu-movil" className="border-t border-tinta-200 bg-white lg:hidden">
+        <div id="menu-movil" className="border-t border-tinta-200 bg-white xl:hidden">
           <nav aria-label="Navegación principal móvil" className="mx-auto max-w-6xl px-4 py-3">
             <ul className="flex flex-col gap-1">
               <li>
@@ -145,43 +134,38 @@ export function Encabezado() {
                   Inicio
                 </NavLink>
               </li>
-              {MODULOS.map((modulo) =>
-                modulo.to ? (
-                  <li key={modulo.nombre}>
-                    <NavLink
-                      to={modulo.to}
+              {MODULOS.map((modulo) => (
+                <li key={modulo.nombre}>
+                  <NavLink
+                    to={modulo.to}
+                    onClick={() => setAbierto(false)}
+                    className="block rounded-control px-3 py-2 text-sm font-medium text-tinta-700 hover:bg-tinta-100"
+                  >
+                    {modulo.nombre}
+                  </NavLink>
+                </li>
+              ))}
+              <li className="mt-2 border-t border-tinta-200 pt-2">
+                {usuario ? (
+                  <div className="flex flex-col gap-1">
+                    <Link
+                      to="/perfil"
                       onClick={() => setAbierto(false)}
                       className="block rounded-control px-3 py-2 text-sm font-medium text-tinta-700 hover:bg-tinta-100"
                     >
-                      {modulo.nombre}
-                    </NavLink>
-                  </li>
-                ) : (
-                  <li key={modulo.nombre}>
-                    <span
-                      aria-disabled="true"
-                      className="flex cursor-not-allowed items-center gap-2 rounded-control px-3 py-2 text-sm text-tinta-400"
+                      Mi perfil
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        cerrarSesion()
+                        setAbierto(false)
+                      }}
+                      className="w-full rounded-control px-3 py-2 text-left text-sm font-medium text-tinta-700 hover:bg-tinta-100"
                     >
-                      {modulo.nombre}
-                      <span className="rounded-full bg-tinta-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-tinta-500">
-                        pronto
-                      </span>
-                    </span>
-                  </li>
-                ),
-              )}
-              <li className="mt-2 border-t border-tinta-200 pt-2">
-                {usuario ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cerrarSesion()
-                      setAbierto(false)
-                    }}
-                    className="w-full rounded-control px-3 py-2 text-left text-sm font-medium text-tinta-700 hover:bg-tinta-100"
-                  >
-                    Cerrar sesión
-                  </button>
+                      Cerrar sesión
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <Link

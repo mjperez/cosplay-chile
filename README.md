@@ -1,33 +1,44 @@
-# Cosplay Chile — API
+# Cosplay Chile
 
-Backend de la plataforma de contenidos, directorio y comunidad para el cosplay
-chileno. Proyecto de TI3043, Ingeniería de Software, INACAP.
+Plataforma web de contenidos, directorio y comunidad para el cosplay chileno.
+Proyecto de TI3043, Ingeniería de Software, INACAP. Un repositorio con dos
+servicios: API FastAPI en `backend/` y cliente React + Tailwind en `frontend/`.
 
-**Estado:** US-01 (infraestructura), US-04a (registro, login, roles, hash y
-JWT), US-03 (sistema de diseño, lado Tailwind) y US-02 (landing y navegación)
-implementadas y verificadas contra la base real. 59 pruebas de backend en verde,
-lint y compilación del frontend sin advertencias.
+**Estado:** plataforma completa y funcional. Los seis módulos tienen pantalla,
+endpoints, reglas de negocio y datos de ejemplo. **121 pruebas de backend en
+verde**, lint del frontend con **0 errores y 0 advertencias**, compilación de
+producción correcta y recorrido extremo a extremo verificado sobre el esquema
+real de migraciones.
+
+| Módulo | Qué ofrece |
+|---|---|
+| Directorio | 20 fichas reales con filtros por región, tipo y búsqueda |
+| Contenidos | guías, entrevistas y artículos; editor de borradores y publicación |
+| Eventos | calendario con filtros, detalle, inscripción con personaje y participantes |
+| Foro | temas por categoría, búsqueda, respuestas y cierre por autor o administrador |
+| Desafíos | desafío del mes vigente, historial y elección de ganador |
+| Comunidad | dónde comprar, grupos regionales y perfil público de cosplayer |
 
 ---
 
 ## Requisitos
 
-- Python 3.13
-- PostgreSQL 17 (Supabase en la nube, o local para desarrollo)
+- Python 3.13 (desarrollado y verificado también con 3.11)
+- Node.js 22 y npm
+- PostgreSQL 17 (Supabase en la nube) o SQLite para una demo local
 - Git
 
 ## Puesta en marcha
 
 ```bash
-git clone https://github.com/mjperez/ti3043-cosplay-chile.git
-cd ti3043-cosplay-chile/backend
+git clone https://github.com/mjperez/cosplay-chile.git
+cd cosplay-chile/backend
 
 python -m venv .venv
 source .venv/Scripts/activate      # Windows (Git Bash)
-# source .venv/bin/activate        # Linux y macOS
+# source .venv/bin/activate       # Linux y macOS
 
 pip install -r requirements-dev.txt
-
 cp .env.example .env
 # completar DATABASE_URL y JWT_SECRET
 ```
@@ -38,99 +49,103 @@ Generar el secreto de JWT:
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-## Base de datos
+Para una demo sin PostgreSQL, basta con poner en `.env`:
 
-Aplicar el esquema:
+```
+DATABASE_URL=sqlite+pysqlite:///./cosplay_demo.db
+JWT_SECRET=una-clave-local-de-mas-de-16-caracteres
+BCRYPT_ROUNDS=4
+ENVIRONMENT=local
+```
+
+## Base de datos y datos semilla
 
 ```bash
 alembic upgrade head
+python -m app.seed.datos_base     # datos reales: 5 categorías + 20 fichas
+python -m app.seed.demo           # datos de demostración (ver abajo)
 ```
 
-Ver el historial de migraciones:
+`app.seed.datos_base` es el que corre en producción: carga las categorías del
+editor y las fichas del directorio levantadas en la investigación. Es
+idempotente, así que puede ejecutarse en cada arranque sin duplicar.
 
-```bash
-alembic history
-alembic current
-```
+`app.seed.demo` crea cuentas, eventos, temas del foro, desafíos, tiendas,
+grupos, un perfil y tres contenidos publicados. **Se niega a correr si
+`ENVIRONMENT=production`** salvo que se fuerce con `DEMO_SEED=1`. También es
+idempotente. Las cuentas que crea, todas con contraseña `Demo2026!`:
 
-Revertir todo:
+| Correo | Rol | Para mostrar |
+|---|---|---|
+| `demo@cosplay.cl` | administrador | publicar contenido, crear eventos y desafíos, elegir ganador |
+| `cosplayer@cosplay.cl` | cosplayer | inscribirse en eventos, responder el foro, editar su perfil |
+| `organizador@cosplay.cl` | organizador | otro participante con inscripciones previas |
 
-```bash
-alembic downgrade base
-```
+> **Seguridad:** las cuentas demo son públicas y conocidas. Úsalas solo en un
+> entorno de clase. En producción deja `DEMO_SEED` sin definir y cambia o borra
+> esas cuentas si alguna vez se cargaron.
 
 ### Nota sobre el proveedor de base de datos
 
 El informe de la asignatura describe el despliegue con **Neon**. La
 implementación corre sobre **Supabase**, porque el proyecto de Neon se dio de
-baja antes de la puesta en marcha.
-
-El cambio no afecta al diseño: ambos son PostgreSQL 17, el esquema no usa
-ninguna extensión específica de proveedor y la cadena de conexión se toma de
-`DATABASE_URL`. Cambiar de proveedor es cambiar una variable de entorno, sin
-tocar código ni migraciones.
-
-La nota queda aquí y no en el informe porque el informe ya está entregado. El
-repositorio es la fuente de verdad sobre lo que efectivamente corre.
+baja antes de la puesta en marcha. Ambos son PostgreSQL 17, el esquema no usa
+extensiones específicas y la cadena se toma de `DATABASE_URL`: cambiar de
+proveedor es cambiar una variable de entorno.
 
 ## Ejecutar
 
 ```bash
-uvicorn app.main:app --reload
+# terminal 1 (backend)
+cd backend && uvicorn app.main:app --reload
+
+# terminal 2 (frontend)
+cd frontend && npm ci && npm run dev
 ```
+
+Frontend en http://localhost:5173 y API en http://localhost:8000. El
+`vite.config.ts` proxya `/api` y `/health`, así que en desarrollo no hace falta
+configurar CORS ni `VITE_API_URL`.
 
 | Ruta | Qué es |
 |---|---|
 | `GET /health` | estado del servicio y de la base |
-| `GET /docs` | documentación interactiva |
+| `GET /docs` | documentación interactiva (29 rutas) |
 | `POST /api/v1/auth/registro` | crear cuenta |
 | `POST /api/v1/auth/login` | obtener token |
 | `GET /api/v1/auth/me` | datos del usuario del token |
 | `GET /api/v1/privacidad` | versión vigente de la política |
-| `GET /api/v1/admin/usuarios` | listado de cuentas (solo administrador) |
+| `GET /api/v1/admin/usuarios` | cuentas (solo administrador) |
+| `GET /api/v1/admin/contenido` | bandeja editorial |
 | `GET /api/v1/proveedores` | directorio con filtros y paginación |
 | `GET /api/v1/proveedores/opciones` | regiones y tipos con fichas cargadas |
-| `GET /api/v1/contenido` | contenido publicado (guías, entrevistas, artículos) |
-| `GET /api/v1/contenido/{id}` | detalle de un contenido publicado |
-| `POST /api/v1/contenido` | crear contenido en borrador (requiere sesión) |
-| `POST /api/v1/contenido/{id}/publicar` | publicar un borrador (solo administrador) |
-| `GET /api/v1/admin/contenido` | bandeja editorial con todos los estados |
-
-## Datos semilla
-
-```bash
-python -m app.seed.proveedores
-```
-
-Carga las 20 fichas del directorio. Es idempotente y correctiva: crea las que
-faltan y arregla las que cambiaron, sin duplicar. El origen de cada ficha está
-documentado en `app/seed/proveedores.py`: salen del levantamiento de
-requerimientos, no de una lista inventada. Solo se guarda lo que la cuenta
-publica abiertamente (nombre comercial, tipo, región cuando corresponde,
-usuario y sitio web); no hay correos ni teléfonos.
-
-Once fichas declaran región: Metropolitana (7), Antofagasta, Valparaíso,
-Coquimbo y Arica y Parinacota. Las otras nueve quedan sin región por dos
-motivos distintos, ambos deliberados:
-
-- **Tres tiendas solo venden online** (MotorLaser, Tienda Deck, FukuBox), así
-  que no tienen una región de atención presencial que declarar.
-- **Cinco cosmakers y un sastre son personas naturales.** Publicar su ubicación
-  es un riesgo de doxxing y no aporta a la función del directorio, que es
-  encontrar un servicio. La región se publica para negocios con dirección
-  comercial, no para individuos.
+| `GET /api/v1/contenido` | contenido publicado |
+| `GET /api/v1/contenido/{id}` | detalle de un contenido |
+| `POST /api/v1/contenido` | crear borrador (requiere sesión) |
+| `POST /api/v1/contenido/{id}/publicar` | publicar (solo administrador) |
+| `GET /api/v1/eventos` | calendario con `tipo`, `region`, `q`, `limite`, `desplazamiento` |
+| `GET /api/v1/eventos/mis` | eventos en los que estoy inscrito |
+| `GET /api/v1/eventos/{id}` | detalle con total de participantes |
+| `GET /api/v1/eventos/{id}/participaciones` | participantes y personaje |
+| `POST /api/v1/eventos` | crear evento (solo administrador) |
+| `POST /api/v1/eventos/{id}/participar` | inscribirse con personaje |
+| `DELETE /api/v1/eventos/{id}/participar` | cancelar inscripción |
+| `GET /api/v1/foro/temas` | temas con `categoria`, `q` y paginación |
+| `GET /api/v1/foro/temas/{id}` | tema y sus respuestas |
+| `POST /api/v1/foro/temas` | abrir tema (requiere sesión) |
+| `POST /api/v1/foro/temas/{id}/respuestas` | responder (tema abierto) |
+| `POST /api/v1/foro/temas/{id}/cerrar` | cerrar (autor o administrador) |
+| `GET /api/v1/desafios` | historial de desafíos |
+| `GET /api/v1/desafios/vigente` | desafío del mes en curso, o `null` |
+| `POST /api/v1/desafios` | crear desafío (solo administrador) |
+| `POST /api/v1/desafios/{id}/ganador` | elegir ganador (solo administrador) |
+| `GET /api/v1/perfiles/mio` | mi perfil |
+| `PUT /api/v1/perfiles/mio` | actualizar mi perfil |
+| `GET /api/v1/perfiles/{id_usuario}` | perfil público |
+| `GET /api/v1/tiendas` | dónde comprar, con filtros y paginación |
+| `GET /api/v1/grupos` | grupos y comunidades, con filtros y paginación |
 
 ## Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Queda en http://localhost:5173. El `vite.config.ts` redirige `/api` y `/health`
-al backend en el puerto 8000, así que en desarrollo no hace falta configurar
-CORS ni variables.
 
 | Script | Qué hace |
 |---|---|
@@ -139,76 +154,115 @@ CORS ni variables.
 | `npm run lint` | oxlint |
 | `npm run preview` | sirve `dist/` para probar la compilación |
 
-Páginas implementadas: inicio, registro, ingreso, política de privacidad y 404.
+Páginas: `/`, `/directorio`, `/contenido`, `/contenido/nuevo`,
+`/contenido/:id`, `/eventos`, `/eventos/:id`, `/foro`, `/foro/:id`,
+`/desafios`, `/comunidad`, `/perfil`, `/ingresar`, `/registro`,
+`/privacidad` y 404. La navegación completa está en el encabezado y en el pie.
+
+`VITE_API_URL` se normaliza en `src/lib/api.ts` y `src/lib/modulos.ts`: se le
+quitan las barras finales antes de concatenar, para que un valor como
+`https://api.ejemplo.com/` no produzca `//api/v1/...`.
 
 ## Pruebas
 
 ```bash
-pytest
+cd backend && pytest
 ```
 
-Corren sobre SQLite en un directorio temporal, con el esquema aplicado por la
-misma migración que se usa en producción. No tocan la base de desarrollo.
+121 pruebas sobre SQLite en un directorio temporal, con el esquema aplicado por
+la misma migración de producción. No tocan la base de desarrollo ni servicios
+externos. Cubren infraestructura, autenticación, autorización, directorio,
+contenido, los seis módulos nuevos y las semillas (incluida su idempotencia).
+
+El recorrido extremo a extremo adicional se documenta en
+[`GUIA_DEMO.md`](GUIA_DEMO.md): migración, semillas, arranque y peticiones
+reales de login, inscripción, foro y perfil.
 
 ## Despliegue en Render
 
-`render.yaml` está en la raíz del repositorio con `rootDir: backend`. Al
-conectar el repositorio, Render lee el archivo y crea el servicio con
-despliegue automático desde `main`.
+`render.yaml` define **dos servicios** con despliegue automático desde `main`:
+
+| Servicio | Tipo | Publica |
+|---|---|---|
+| `cosplay-chile-api` | web (Python) | `backend/`, con `/health` como health check |
+| `cosplay-chile-web` | static | `frontend/dist`, con rewrite `/* -> /index.html` para React Router |
+
+El `startCommand` del backend aplica migraciones y ejecuta
+`app.seed.datos_base` en cada arranque. Si `DEMO_SEED=1`, además corre
+`app.seed.demo` para la demo en clases.
 
 Variables que se cargan a mano en el panel:
 
-| Variable | Valor |
-|---|---|
-| `DATABASE_URL` | cadena del pooler de Supabase, con `sslmode=require` |
-| `JWT_SECRET` | la genera Render (`generateValue: true`) |
+| Variable | Servicio | Valor |
+|---|---|---|
+| `DATABASE_URL` | API | cadena del pooler de Supabase, con `sslmode=require` |
+| `JWT_SECRET` | API | la genera Render (`generateValue: true`) |
+| `CORS_ORIGINS` | API | URL pública del frontend, sin barra final |
+| `VITE_API_URL` | Web | URL pública del backend, sin barra final |
+| `DEMO_SEED` | API | `1` solo para la demo; quitar después |
+
+`CORS_ORIGINS` y `VITE_API_URL` se necesitan entre sí: primero crea el backend
+para obtener su URL, luego el frontend, y por último vuelve al backend a
+poner la URL del frontend en `CORS_ORIGINS`. Si `CORS_ORIGINS` queda con el
+valor por defecto (`http://localhost:5173`), el navegador bloquea las
+peticiones en producción.
 
 ## Flujo de ramas
 
 | Rama | Uso | Despliegue |
 |---|---|---|
-| `main` | código desplegable | automático en Render |
+| `main` | código desplegable | automático en Render (ambos servicios) |
 | `dev` | integración del sprint | manual |
 
 ---
 
 ## Decisiones de implementación
 
-**Singleton con `__new__` y lock.** El gestor de sesiones no es una variable de
-módulo: se sobreescribe `__new__`, que es el punto donde Python decide si
-instancia. Así dos importaciones distintas no pueden construir dos motores. El
-lock con doble verificación cubre el arranque concurrente.
+**Arquitectura en capas.** `routes -> services -> repositories -> models`.
+Cada módulo nuevo (eventos, foro, desafíos, perfiles, tiendas, grupos) tiene
+su esquema Pydantic, su repositorio de consultas, su servicio de reglas y su
+router. Ningún endpoint escribe SQL y ningún servicio conoce HTTP.
 
-**Tipos portables en lugar de tipos nativos de PostgreSQL.** `Uuid`, `JSON` y
-`Enum` sin tipo nativo compilan a `UUID`, `JSON` y `VARCHAR` en PostgreSQL, y a
-`CHAR(32)`, `JSON` y `VARCHAR` en SQLite. Eso permite correr la migración
-completa en las pruebas sin levantar un servidor.
+**Fechas en UTC naive.** `EventoEntrada` convierte cualquier datetime con zona
+a UTC sin zona antes de guardarlo. SQLite no conserva el offset y PostgreSQL
+interpreta un naive en la zona del servidor; guardar siempre UTC evita que la
+misma hora se lea distinta en pruebas y producción. El frontend agrega `Z` a
+esos valores y formatea en `America/Santiago`.
 
-**`/health` devuelve 503 cuando la base no responde.** Render usa esa ruta para
-decidir si enruta tráfico. Un 200 con la base caída mandaría peticiones a un
-proceso que no puede atenderlas. En producción el mensaje del driver se
-reemplaza por uno genérico para no filtrar host, puerto ni usuario.
+**Rutas literales antes que rutas con parámetro.** `/eventos/mis` se registra
+antes de `/eventos/{id_evento}` y `/perfiles/mio` antes de
+`/perfiles/{id_usuario}`; si se invirtiera, FastAPI intentaría parsear `mis`
+como UUID y devolvería 422.
 
-**Herencia de tabla unida para `Contenido`.** El diagrama de clases declara una
-clase abstracta con tres subclases. En la base se traduce a una tabla base más
-una tabla por subtipo que comparte la clave primaria. Deja la creación a cargo
-de la fábrica de US-08.
+**Singleton con `__new__` y lock.** El gestor de sesiones se construye una sola
+vez, con doble verificación para arranques concurrentes.
 
-**El bloqueo por intentos vive en la base, no en memoria.** Un diccionario en
-memoria se pierde al reiniciar y da un contador distinto por cada worker de
-uvicorn. La tabla `intento_login` lo persiste y permite auditar.
+**Tipos portables.** `Uuid`, `JSON` y `Enum` sin tipo nativo compilan a
+`UUID`/`JSON`/`VARCHAR` en PostgreSQL y a `CHAR(32)`/`JSON`/`VARCHAR` en
+SQLite, lo que permite correr la migración completa en las pruebas.
 
-**El rol se lee de la base, no del token.** `requiere_roles` consulta el rol
-actual del usuario. Así revocar un permiso surte efecto de inmediato, sin
-esperar a que venza el token emitido.
+**`/health` devuelve 503 si la base no responde.** Render usa esa ruta para
+decidir si enruta tráfico; en producción el mensaje del driver se reemplaza
+por uno genérico para no filtrar host ni usuario.
 
-**El intento fallido se confirma antes de responder 401.** El endpoint va a
-devolver un error y la sesión se revertiría al salir. Si el intento no se
-confirmara ahí, el contador de bloqueo nunca avanzaría.
+**Herencia de tabla unida para `Contenido`.** Una tabla base y una por subtipo
+que comparte la clave primaria, con la creación a cargo de
+`ContenidoFactory`.
 
-**`password_hash` y consentimiento existen desde la primera migración.** No son
-parte del alcance de US-01, pero la tabla `usuario` sin ellos obligaría a una
-segunda migración sobre la misma entidad en US-04a.
+**El bloqueo por intentos vive en la base**, no en memoria: sobrevive a
+reinicios y es consistente entre workers. El intento fallido se confirma antes
+de responder 401 para que el contador avance.
+
+**El rol se lee de la base, no del token**, así revocar un permiso surte efecto
+de inmediato.
+
+**Semillas separadas por entorno.** `datos_base` son datos reales y corren
+siempre; `demo` crea cuentas conocidas y se bloquea en producción. Ninguna
+credencial vive en el repositorio.
+
+**Errores de carga sin render en cascada.** Las páginas nuevas reinician su
+estado de carga dentro de una microtarea, no de forma sincrónica en el
+`useEffect`, y usan una bandera `vigente` para descartar respuestas tardías.
 
 ---
 
@@ -229,18 +283,24 @@ segunda migración sobre la misma entidad en US-04a.
 | Criterio | Dónde | Verificación |
 |---|---|---|
 | Contraseña con bcrypt; sin texto plano en la BD | `app/core/security.py` | `test_registro.py::test_la_contrasena_se_guarda_hasheada` |
-| Credenciales inválidas dan 401 sin revelar si el correo existe | `app/api/routes/auth.py`, `app/services/auth.py` | `test_login.py::test_correo_inexistente_responde_igual_que_contrasena_incorrecta` |
-| Consentimiento con fecha y versión | `app/models/usuario.py`, `app/core/privacidad.py` | `test_registro.py::test_el_consentimiento_queda_con_fecha_y_version` |
-| Sesión persiste tras recargar; token vencido da 401 | `app/core/security.py`, `app/api/deps.py` | `test_autorizacion.py::test_el_token_sirve_en_varias_peticiones` y `test_token_vencido_devuelve_401` |
-| Rol sin permisos recibe 403 en administración | `app/api/deps.py` | `test_autorizacion.py::test_usuario_normal_recibe_403_en_endpoints_de_administracion` |
-| 5 intentos fallidos en 15 min bloquean el login | `app/services/auth.py`, `app/models/intento_login.py` | `test_login.py::test_cinco_fallos_bloquean_el_login` |
+| Credenciales inválidas dan 401 sin revelar si el correo existe | `app/api/routes/auth.py` | `test_login.py::test_correo_inexistente_responde_igual_que_contrasena_incorrecta` |
+| Consentimiento con fecha y versión | `app/models/usuario.py` | `test_registro.py::test_el_consentimiento_queda_con_fecha_y_version` |
+| Sesión persiste tras recargar; token vencido da 401 | `app/core/security.py` | `tests/test_autorizacion.py` |
+| Rol sin permisos recibe 403 en administración | `app/api/deps.py` | `tests/test_autorizacion.py` |
+| 5 intentos fallidos en 15 min bloquean el login | `app/services/auth.py` | `test_login.py::test_cinco_fallos_bloquean_el_login` |
 
-**Nota sobre el criterio del rol.** El criterio dice «un usuario con rol
-`usuario`». El modelo de actores del informe define ocho roles (visitante,
-cosplayer, cosmaker, sastre, tienda, fotógrafo, organizador, administrador) y
-no incluye `usuario`. La prueba usa `cosplayer`, que es el rol por defecto de
-una cuenta nueva. El comportamiento es el mismo para los siete roles que no son
-`administrador`.
+### Módulos de comunidad
+
+| Criterio | Dónde | Verificación |
+|---|---|---|
+| Calendario con filtros, detalle e inscripción única por usuario | `app/services/evento.py` | `tests/test_modulos_nuevos.py` |
+| Foro con temas, respuestas y cierre por autor o administrador | `app/services/comunidad.py` | `tests/test_modulos_nuevos.py` |
+| Desafío vigente por mes, sin duplicados | `app/services/comunidad.py` | `tests/test_modulos_nuevos.py` |
+| Perfil público editable y catálogos de tiendas/grupos | `app/services/perfil.py` | `tests/test_modulos_nuevos.py` |
+| Semillas idempotentes y bloqueadas en producción | `app/seed/demo.py` | `tests/test_semilla_demo.py` |
+
+La matriz completa de casos por requerimiento está en
+[`backend/tests/casos_por_rf.md`](backend/tests/casos_por_rf.md).
 
 ---
 
@@ -250,7 +310,10 @@ una cuenta nueva. El comportamiento es el mismo para los siete roles que no son
   dar un mensaje útil, y no permite probar contraseñas.
 - **No hay refresh token.** Al vencer el token (60 min por defecto) hay que
   volver a iniciar sesión.
-- **El bloqueo es por correo, no por IP.** Un atacante puede bloquear la cuenta
-  de otra persona a propósito. Se mitiga con la ventana de 15 minutos.
-- **Las pantallas de registro y login (T-04.5) no están en este repositorio.**
-  Dependen del armazón de frontend que crea US-02.
+- **El bloqueo es por correo, no por IP.** Se mitiga con la ventana de 15 min.
+- **Sin panel de administración visual.** Crear eventos, desafíos, elegir
+  ganador y publicar borradores se hace por la API (`/docs`); la interfaz
+  cubre el flujo de los usuarios finales.
+- **Sin carga de imágenes.** Los contenidos usan texto y HTML saneado; el
+  portafolio del perfil es un enlace externo.
+- **Las cuentas demo son inseguras por diseño.** Solo para entornos de clase.

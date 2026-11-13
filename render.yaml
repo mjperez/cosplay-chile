@@ -8,7 +8,13 @@ services:
     branch: main
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Las semillas van después de las migraciones y son idempotentes: cargan
+    # las 5 categorías y las 20 fichas reales del directorio. Sin ellas el
+    # directorio sale vacío y el editor de contenido no puede crear borradores.
+    # DEMO_SEED=1 es optativo y solo para exponer la plataforma en clases:
+    # crea cuentas y contenido de ejemplo. Quitar la variable y redesplegar
+    # deja de ejecutarlo; las filas ya creadas hay que borrarlas a mano.
+    startCommand: alembic upgrade head && python -m app.seed.datos_base && if [ "$DEMO_SEED" = "1" ]; then python -m app.seed.demo; fi && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
