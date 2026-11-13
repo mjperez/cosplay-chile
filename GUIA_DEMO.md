@@ -202,6 +202,8 @@ curl -X POST http://localhost:8000/api/v1/admin/eventos \
 - [ ] `http://localhost:8000/health` responde 200 (o el health check de Render está en verde).
 - [ ] La portada carga y las seis tarjetas llevan a páginas reales.
 - [ ] Puedes iniciar sesión con `cosplayer@cosplay.cl` / `Demo2026!`.
+- [ ] El encabezado dice **Hola, Usuario Administrador** (o *Usuario Cosplayer*),
+      no un nombre de persona: así se ve de inmediato con qué rol entraste.
 - [ ] `/eventos` muestra 6 eventos y `/foro` muestra 5 temas.
 - [ ] Entrando como `demo@cosplay.cl` se ve **Administración** y `/admin` carga el resumen.
 - [ ] En Render, el login `demo@cosplay.cl` / `Demo2026!` responde 200 (si da 401, redesplegar la API).
