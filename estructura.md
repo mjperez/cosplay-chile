@@ -107,7 +107,7 @@ cosplay-chile/
     ├── .env.example
     └── src/
         ├── main.tsx                  monta React, el router y el proveedor de sesión
-        ├── App.tsx                   tabla de rutas (15 páginas)
+        ├── App.tsx                   tabla de rutas (16 páginas)
         ├── index.css                 tokens del sistema de diseño (@theme)
         ├── lib/
         │   ├── api.ts                cliente HTTP y tipos del backend
