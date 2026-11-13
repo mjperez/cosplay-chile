@@ -104,8 +104,8 @@ def datos_registro():
     from app.core.privacidad import VERSION
 
     return {
-        "nombre": "Camila Rojas",
-        "correo": "camila@ejemplo.cl",
+        "nombre": "Usuario de Prueba",
+        "correo": "usuario.prueba@ejemplo.cl",
         "password": "Cosplay2026!",
         "rol": "cosplayer",
         "region": "Valparaíso",

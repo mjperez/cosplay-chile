@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.database import get_session_manager
+from app.repositories import usuario as repo_usuarios
 from app.seed import demo
 
 RUTA_EVENTOS = "/api/v1/eventos"
@@ -62,6 +63,50 @@ def test_las_cuentas_demo_permiten_entrar(cliente):
         json={"correo": "cosplayer@cosplay.cl", "password": demo.PASSWORD_DEMO},
     )
     assert respuesta_cosplayer.status_code == 200
+
+
+def test_las_cuentas_demo_se_llaman_segun_su_rol(cliente):
+    """El nombre visible debe decir el permiso, no sonar a persona inventada."""
+    _cargar()
+
+    etiquetas = {
+        "administrador": "Usuario Administrador",
+        "cosplayer": "Usuario Cosplayer",
+        "organizador": "Usuario Organizador",
+    }
+    for dato in demo.USUARIOS_DEMO:
+        assert dato["nombre"] == etiquetas[dato["rol"]]
+
+    respuesta = cliente.post(
+        "/api/v1/auth/login",
+        json={"correo": "demo@cosplay.cl", "password": demo.PASSWORD_DEMO},
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["usuario"]["nombre"] == "Usuario Administrador"
+
+
+def test_recargar_la_semilla_corrige_nombres_de_cuentas_ya_creadas(cliente):
+    """Una base creada con la versión anterior debe adoptar las etiquetas nuevas."""
+    _cargar()
+
+    with get_session_manager().session() as sesion:
+        cuenta = repo_usuarios.obtener_por_correo(sesion, "demo@cosplay.cl")
+        repo_usuarios.actualizar_nombre(sesion, cuenta, nombre="Camila Rojas")
+
+    _cargar()
+
+    with get_session_manager().session() as sesion:
+        cuenta = repo_usuarios.obtener_por_correo(sesion, "demo@cosplay.cl")
+        assert cuenta.nombre == "Usuario Administrador"
+        assert cuenta.rol == "administrador"
+        assert repo_usuarios.contar(sesion) == 3  # no se duplicó la cuenta
+
+    respuesta = cliente.post(
+        "/api/v1/auth/login",
+        json={"correo": "demo@cosplay.cl", "password": demo.PASSWORD_DEMO},
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["usuario"]["nombre"] == "Usuario Administrador"
 
 
 def test_el_detalle_de_un_evento_muestra_participantes(cliente):

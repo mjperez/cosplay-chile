@@ -6,7 +6,7 @@ servicios: API FastAPI en `backend/` y cliente React + Tailwind en `frontend/`.
 
 **Estado:** plataforma completa y funcional. Los seis módulos y el panel de
 administración tienen pantalla, endpoints, reglas de negocio y datos de ejemplo.
-**136 pruebas de backend en verde**, lint del frontend con **0 errores y 0
+**138 pruebas de backend en verde**, lint del frontend con **0 errores y 0
 advertencias**, compilación de producción correcta y recorrido extremo a extremo
 verificado sobre el esquema real de migraciones (26/26 comprobaciones).
 
@@ -76,11 +76,17 @@ grupos, un perfil y tres contenidos publicados. **Se niega a correr si
 `ENVIRONMENT=production`** salvo que se fuerce con `DEMO_SEED=1`. También es
 idempotente. Las cuentas que crea, todas con contraseña `Demo2026!`:
 
-| Correo | Rol | Para mostrar |
-|---|---|---|
-| `demo@cosplay.cl` | administrador | entrar a `/admin`, publicar contenido, crear eventos y desafíos, elegir ganador |
-| `cosplayer@cosplay.cl` | cosplayer | inscribirse en eventos, responder el foro, editar su perfil |
-| `organizador@cosplay.cl` | organizador | otro participante con inscripciones previas |
+| Correo | Nombre visible | Rol | Para mostrar |
+|---|---|---|---|
+| `demo@cosplay.cl` | Usuario Administrador | administrador | entrar a `/admin`, publicar contenido, crear eventos y desafíos, elegir ganador |
+| `cosplayer@cosplay.cl` | Usuario Cosplayer | cosplayer | inscribirse en eventos, responder el foro, editar su perfil |
+| `organizador@cosplay.cl` | Usuario Organizador | organizador | otro participante con inscripciones previas |
+
+Los nombres dicen el rol a propósito: al exponer la plataforma se ve de
+inmediato con qué permisos se está entrando, sin recordar un nombre de persona
+inventado. La semilla también **sincroniza el nombre de cuentas ya creadas**,
+así que recargarla en una base anterior adopta las etiquetas nuevas sin
+duplicar usuarios ni tocar contraseñas, roles o consentimientos.
 
 > **Seguridad:** las cuentas demo son públicas y conocidas. Úsalas solo en un
 > entorno de clase. En producción deja `DEMO_SEED` sin definir y cambia o borra
@@ -201,7 +207,7 @@ quitan las barras finales antes de concatenar, para que un valor como
 cd backend && pytest
 ```
 
-136 pruebas sobre SQLite en un directorio temporal, con el esquema aplicado por
+138 pruebas sobre SQLite en un directorio temporal, con el esquema aplicado por
 la misma migración de producción. No tocan la base de desarrollo ni servicios
 externos. Cubren infraestructura, autenticación, autorización, directorio,
 contenido, los seis módulos nuevos, el panel de administración y las semillas

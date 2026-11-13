@@ -1,7 +1,7 @@
 # Matriz de casos por requerimiento (EV4)
 
 Trazabilidad entre los requerimientos funcionales, el código que los implementa
-y las pruebas automatizadas que los verifican. Las 136 pruebas se ejecutan con
+y las pruebas automatizadas que los verifican. Las 138 pruebas se ejecutan con
 `pytest` desde `backend/` y no requieren servicios externos.
 
 Convención: `ID de caso` identifica la fila; `Archivo` es la prueba que la
@@ -86,6 +86,8 @@ cubre; `Resultado` es el estado observado en la última ejecución completa.
 | C-33 | La semilla es idempotente | `app/seed/demo.py` | `test_la_semilla_es_idempotente` | ✅ |
 | C-34 | El perfil de ejemplo es público | `app/seed/demo.py` | `test_el_perfil_de_ejemplo_es_publico` | ✅ |
 | C-35 | La semilla se rechaza en producción | `app/seed/demo.py` | `test_la_semilla_se_rechaza_en_produccion` | ✅ |
+| C-50 | Las cuentas demo se nombran por su rol | `app/seed/demo.py` | `test_las_cuentas_demo_se_llaman_segun_su_rol` | ✅ |
+| C-51 | Recargar corrige nombres de cuentas ya creadas | `app/repositories/usuario.py`, `app/seed/demo.py` | `test_recargar_la_semilla_corrige_nombres_de_cuentas_ya_creadas` | ✅ |
 
 ## RF-10 · Panel de administración
 
@@ -124,6 +126,6 @@ reproducible está en [`GUIA_DEMO.md`](../../GUIA_DEMO.md).
 | Autenticación y autorización | 38 |
 | Directorio y contenido | 37 |
 | Módulos nuevos | 18 |
-| Semillas de demostración | 7 |
+| Semillas de demostración | 9 |
 | Panel de administración | 15 |
-| **Total** | **136** |
+| **Total** | **138** |

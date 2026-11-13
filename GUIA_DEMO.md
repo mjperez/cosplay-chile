@@ -7,7 +7,7 @@ haber tocado tu PC. Esta guía asume que ya fusionaste el pull request.
 
 | Verificación | Resultado |
 |---|---|
-| Pruebas de backend (`pytest`) | **136 en verde** |
+| Pruebas de backend (`pytest`) | **138 en verde** |
 | Lint del frontend (`npm run lint`) | **0 errores, 0 advertencias** |
 | Compilación (`npm run build`) | **correcta**, genera `dist/` |
 | Recorrido HTTP real con datos | **26/26 comprobaciones en verde** |
@@ -116,11 +116,17 @@ nueva, y el bundle del frontend ya incluye el panel de administración.
 
 Todas con contraseña **`Demo2026!`**:
 
-| Correo | Rol | Sirve para |
-|---|---|---|
-| `demo@cosplay.cl` | administrador | abrir `/admin`, crear eventos/desafíos, elegir ganador, publicar borradores, moderar el foro |
-| `cosplayer@cosplay.cl` | cosplayer | inscribirse, responder el foro, editar perfil |
-| `organizador@cosplay.cl` | organizador | mostrar que ya tiene inscripciones previas |
+| Correo | Se ve como | Rol | Sirve para |
+|---|---|---|---|
+| `demo@cosplay.cl` | **Usuario Administrador** | administrador | abrir `/admin`, crear eventos/desafíos, elegir ganador, publicar borradores, moderar el foro |
+| `cosplayer@cosplay.cl` | **Usuario Cosplayer** | cosplayer | inscribirse, responder el foro, editar perfil |
+| `organizador@cosplay.cl` | **Usuario Organizador** | organizador | mostrar que ya tiene inscripciones previas |
+
+El nombre visible dice el rol: al proyectar la pantalla, quien mira sabe al
+instante con qué permisos se entró, sin tener que acordarse de un nombre de
+persona. Si tu base ya tenía las cuentas de una versión anterior, basta con
+volver a ejecutar la semilla: **sincroniza los nombres** sin duplicar cuentas
+ni cambiar contraseñas, roles o consentimientos.
 
 Datos precargados: **6 eventos** (con 3 inscripciones de ejemplo), **5 temas
 del foro** con respuestas, **2 desafíos** (el vigente y el anterior con
@@ -158,7 +164,7 @@ categorías** y **3 contenidos publicados**.
    verlo en `/eventos`) → **Foro** (ocultar un tema y comprobar que sale del
    foro público, luego reabrirlo) → **Usuarios** (la cuenta admin no se puede
    desactivar a sí misma). Cada acción recarga el panel con un aviso verde.
-9. **Cierre (30 s).** Abrir `/docs` y mostrar las 43 rutas; mencionar 136
+9. **Cierre (30 s).** Abrir `/docs` y mostrar las 43 rutas; mencionar 138
    pruebas, lint limpio y los dos servicios de Render.
 
 ### Si quieres mostrar la API por debajo del panel

@@ -44,6 +44,17 @@ def crear(
     return usuario
 
 
+def actualizar_nombre(sesion: Session, usuario: Usuario, *, nombre: str) -> Usuario:
+    """Sincroniza la etiqueta visible de una cuenta demo ya existente.
+
+    Solo toca el nombre: la contraseña, el rol y el consentimiento de una
+    cuenta creada en una ejecución anterior se conservan tal cual.
+    """
+    usuario.nombre = nombre
+    sesion.flush()
+    return usuario
+
+
 def contar(sesion: Session) -> int:
     return sesion.scalar(select(func.count()).select_from(Usuario)) or 0
 

@@ -7,13 +7,19 @@ usa `app.seed.datos_base`, que solo carga datos reales y no crea cuentas.
 
     python -m app.seed.demo
 
-Cuentas que crea (todas con contraseña `Demo2026!`):
+Cuentas que crea (todas con contraseña `Demo2026!`). El nombre visible dice
+el rol a propósito: al exponer la plataforma en clases, quien mira la pantalla
+debe saber de inmediato con qué permisos está entrando, sin tener que recordar
+un nombre de persona inventado.
 
-    demo@cosplay.cl         administrador
-    cosplayer@cosplay.cl    cosplayer
-    organizador@cosplay.cl  organizador
+    demo@cosplay.cl         Usuario Administrador
+    cosplayer@cosplay.cl    Usuario Cosplayer
+    organizador@cosplay.cl  Usuario Organizador
 
-Es idempotente: se puede ejecutar varias veces sin duplicar filas.
+Es idempotente: se puede ejecutar varias veces sin duplicar filas. Si las
+cuentas ya existen, sincroniza su nombre visible con esta lista, de modo que
+un cambio de etiqueta se refleje también en bases creadas con versiones
+anteriores.
 """
 
 from __future__ import annotations
@@ -41,9 +47,9 @@ from app.seed import datos_base
 PASSWORD_DEMO = "Demo2026!"
 
 USUARIOS_DEMO = [
-    {"nombre": "Camila Rojas", "correo": "demo@cosplay.cl", "rol": "administrador", "region": "Metropolitana"},
-    {"nombre": "Matías Fuentes", "correo": "cosplayer@cosplay.cl", "rol": "cosplayer", "region": "Valparaíso"},
-    {"nombre": "Antonia Soto", "correo": "organizador@cosplay.cl", "rol": "organizador", "region": "Biobío"},
+    {"nombre": "Usuario Administrador", "correo": "demo@cosplay.cl", "rol": "administrador", "region": "Metropolitana"},
+    {"nombre": "Usuario Cosplayer", "correo": "cosplayer@cosplay.cl", "rol": "cosplayer", "region": "Valparaíso"},
+    {"nombre": "Usuario Organizador", "correo": "organizador@cosplay.cl", "rol": "organizador", "region": "Biobío"},
 ]
 
 EVENTOS = [
@@ -141,6 +147,11 @@ def _usuarios(sesion: Session) -> dict[str, Usuario]:
                 consentimiento_fecha=datetime.now(timezone.utc),
                 consentimiento_version=VERSION,
             )
+        elif existente.nombre != dato["nombre"]:
+            # La cuenta puede venir de una versión anterior de la semilla, con
+            # un nombre de persona. Sin esto, recargar no cambiaría la etiqueta
+            # que se ve en el encabezado y en el panel de administración.
+            repo_usuarios.actualizar_nombre(sesion, existente, nombre=dato["nombre"])
         creados[dato["correo"]] = existente
     return creados
 

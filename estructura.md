@@ -81,7 +81,7 @@ cosplay-chile/
 │           ├── proveedores.py  20 fichas reales del directorio
 │           ├── categorias.py   5 categorías de contenido
 │           ├── datos_base.py   orquestador idempotente para producción
-│           └── demo.py         cuentas y contenido para la demo en clases
+│           └── demo.py         cuentas por rol y contenido para clases
 │   ├── migrations/
 │   │   ├── env.py
 │   │   ├── script.py.mako
@@ -103,7 +103,7 @@ cosplay-chile/
 │   │   ├── test_contenido.py
 │   │   ├── test_modulos_nuevos.py    eventos, foro, desafíos, perfiles, catálogos
 │   │   ├── test_panel_admin.py       permisos, resumen, editorial, moderación y altas
-│   │   └── test_semilla_demo.py      idempotencia y bloqueo en producción
+│   │   └── test_semilla_demo.py      idempotencia, nombres por rol, bloqueo en prod.
 │   └── exp/                          apuntes de exploración, no es código del producto
 └── frontend/
     ├── index.html                    documento raíz, lang="es-CL"
