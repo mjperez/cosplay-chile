@@ -95,11 +95,17 @@ nueva, y el bundle del frontend ya incluye el panel de administración.
    Orden importante: crea primero el backend para obtener su URL, ponla en
    `VITE_API_URL`, crea el frontend y copia su URL en `CORS_ORIGINS`. Sin
    `CORS_ORIGINS` el navegador bloquea todas las peticiones.
-4. **No hace falta configurar `DEMO_SEED` a mano**: el `startCommand` lo
-   deja en `1` si la variable no existe, así que las cuentas de ejemplo se
-   crean en el arranque aunque el servicio de Render sea antiguo. Si el login
-   `demo@cosplay.cl` todavía da 401, haz **Manual Deploy → Deploy latest
-   commit** en `cosplay-chile-api` para que tome el `render.yaml` nuevo.
+4. **Si el login `demo@cosplay.cl` da 401**, el servicio se creó antes del
+   cambio de `render.yaml` y sigue usando su `startCommand` anterior: Render
+   no vuelve a leer el blueprint al hacer `git push`. Haz una de estas dos
+   cosas, cualquiera sirve:
+   - **Environment** del servicio `cosplay-chile-api` → añadir `DEMO_SEED=1`
+     → **Manual Deploy → Deploy latest commit**.
+   - O, en el Blueprint, **Sync / Apply** para que tome el `render.yaml` nuevo,
+     que ya trae `DEMO_SEED=1` por defecto.
+
+   En un despliegue **nuevo** no hay que hacer nada: la semilla demo corre
+   sola. Compruébalo entrando con `demo@cosplay.cl` / `Demo2026!`.
 5. Tras la demo, **pon `DEMO_SEED=0`** y vuelve a desplegar. Las filas ya
    creadas no se borran solas: elimina las tres cuentas demo desde la base o
    cambia sus contraseñas.
@@ -204,6 +210,8 @@ curl -X POST http://localhost:8000/api/v1/admin/eventos \
 | Errores de CORS en la consola | `CORS_ORIGINS` no incluye la URL del frontend | Añádela en Render y reinicia el servicio API |
 | Directorio o contenidos vacíos | No corrieron las semillas | `python -m app.seed.datos_base` (y `demo` si quieres las cuentas) |
 | Login devuelve 401 con la contraseña correcta | Se cargó `datos_base` pero no `demo` | `python -m app.seed.demo` |
+| En Render el login demo da 401 | El servicio existente no tomó el `render.yaml` nuevo | Añadir `DEMO_SEED=1` en Environment y **Manual Deploy**, o hacer **Sync** del Blueprint |
+| El login demo da 429 | Demasiados intentos fallidos seguidos (bloqueo de 15 min por correo) | Esperar 15 min; el contador se libera solo |
 | `alembic` falla con «table already exists» | Base de una ejecución anterior | Borra `cosplay_demo.db` y vuelve a correr migración + semillas |
 | 404 al recargar `/eventos` en Render | Falta la regla de rewrite | `render.yaml` ya la trae; verifica que el servicio sea de tipo `static` |
 

@@ -222,8 +222,10 @@ reales de login, inscripción, foro y perfil.
 
 El `startCommand` del backend aplica migraciones y ejecuta
 `app.seed.datos_base` en cada arranque. Después corre `app.seed.demo` **por
-defecto** (`DEMO_SEED=1`), de modo que la entrega en clases funciona sin
-configurar nada en el panel. Al terminar la demo, cambia `DEMO_SEED` a `0`,
+defecto** (`DEMO_SEED=1`), de modo que un despliegue nuevo funciona sin
+configurar nada en el panel. Si el servicio de Render ya existía, sincroniza el
+blueprint o añade `DEMO_SEED=1` a mano y redespliega: Render no relee
+`render.yaml` con un `git push`. Al terminar la demo, cambia `DEMO_SEED` a `0`,
 redespliega y borra las cuentas de ejemplo: sus contraseñas son públicas.
 
 Variables que se cargan a mano en el panel:
