@@ -31,17 +31,52 @@ export function Pie() {
                 Ingresar
               </Link>
             </li>
+            <li>
+              <Link to="/perfil" className="text-tinta-700 hover:text-marca-700">
+                Mi perfil
+              </Link>
+            </li>
           </ul>
         </div>
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-tinta-500">
-            Legal
+            Módulos
           </p>
-          <ul className="mt-3 space-y-2 text-sm">
+          <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <li>
+              <Link to="/directorio" className="text-tinta-700 hover:text-marca-700">
+                Directorio
+              </Link>
+            </li>
+            <li>
+              <Link to="/contenido" className="text-tinta-700 hover:text-marca-700">
+                Contenidos
+              </Link>
+            </li>
+            <li>
+              <Link to="/eventos" className="text-tinta-700 hover:text-marca-700">
+                Eventos
+              </Link>
+            </li>
+            <li>
+              <Link to="/foro" className="text-tinta-700 hover:text-marca-700">
+                Foro
+              </Link>
+            </li>
+            <li>
+              <Link to="/desafios" className="text-tinta-700 hover:text-marca-700">
+                Desafíos
+              </Link>
+            </li>
+            <li>
+              <Link to="/comunidad" className="text-tinta-700 hover:text-marca-700">
+                Comunidad
+              </Link>
+            </li>
             <li>
               <Link to="/privacidad" className="text-tinta-700 hover:text-marca-700">
-                Política de privacidad
+                Privacidad
               </Link>
             </li>
           </ul>

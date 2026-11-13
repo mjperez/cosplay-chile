@@ -45,6 +45,11 @@ def obtener(sesion: Session, id_contenido: uuid.UUID) -> Contenido | None:
     return sesion.get(Contenido, id_contenido)
 
 
+def por_titulo(sesion: Session, titulo: str) -> Contenido | None:
+    """Búsqueda exacta por título, usada por la semilla de demostración."""
+    return sesion.scalar(select(Contenido).where(Contenido.titulo == titulo))
+
+
 def listar_categorias(sesion: Session) -> list[CategoriaContenido]:
     return list(sesion.scalars(select(CategoriaContenido).order_by(CategoriaContenido.nombre)))
 

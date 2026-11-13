@@ -138,7 +138,10 @@ export class ErrorApi extends Error {
   }
 }
 
-const BASE = import.meta.env.VITE_API_URL ?? ''
+// La URL del backend se pega a mano en el panel de Render. Si termina en «/»,
+// concatenarla con rutas que ya empiezan por «/» produce //api/v1/... y el
+// backend responde 404. Se recorta aquí, en el único punto donde se arma la URL.
+const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
 
 export function leerToken(): string | null {
   return localStorage.getItem(CLAVE_TOKEN)
