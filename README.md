@@ -4,11 +4,11 @@ Plataforma web de contenidos, directorio y comunidad para el cosplay chileno.
 Proyecto de TI3043, Ingeniería de Software, INACAP. Un repositorio con dos
 servicios: API FastAPI en `backend/` y cliente React + Tailwind en `frontend/`.
 
-**Estado:** plataforma completa y funcional. Los seis módulos tienen pantalla,
-endpoints, reglas de negocio y datos de ejemplo. **121 pruebas de backend en
-verde**, lint del frontend con **0 errores y 0 advertencias**, compilación de
-producción correcta y recorrido extremo a extremo verificado sobre el esquema
-real de migraciones.
+**Estado:** plataforma completa y funcional. Los seis módulos y el panel de
+administración tienen pantalla, endpoints, reglas de negocio y datos de ejemplo.
+**136 pruebas de backend en verde**, lint del frontend con **0 errores y 0
+advertencias**, compilación de producción correcta y recorrido extremo a extremo
+verificado sobre el esquema real de migraciones (26/26 comprobaciones).
 
 | Módulo | Qué ofrece |
 |---|---|
@@ -18,6 +18,7 @@ real de migraciones.
 | Foro | temas por categoría, búsqueda, respuestas y cierre por autor o administrador |
 | Desafíos | desafío del mes vigente, historial y elección de ganador |
 | Comunidad | dónde comprar, grupos regionales y perfil público de cosplayer |
+| Administración | panel visual con métricas, bandeja editorial, eventos, foro, desafíos, cuentas y comunidad |
 
 ---
 
@@ -77,7 +78,7 @@ idempotente. Las cuentas que crea, todas con contraseña `Demo2026!`:
 
 | Correo | Rol | Para mostrar |
 |---|---|---|
-| `demo@cosplay.cl` | administrador | publicar contenido, crear eventos y desafíos, elegir ganador |
+| `demo@cosplay.cl` | administrador | entrar a `/admin`, publicar contenido, crear eventos y desafíos, elegir ganador |
 | `cosplayer@cosplay.cl` | cosplayer | inscribirse en eventos, responder el foro, editar su perfil |
 | `organizador@cosplay.cl` | organizador | otro participante con inscripciones previas |
 
@@ -110,7 +111,7 @@ configurar CORS ni `VITE_API_URL`.
 | Ruta | Qué es |
 |---|---|
 | `GET /health` | estado del servicio y de la base |
-| `GET /docs` | documentación interactiva (29 rutas) |
+| `GET /docs` | documentación interactiva (43 rutas) |
 | `POST /api/v1/auth/registro` | crear cuenta |
 | `POST /api/v1/auth/login` | obtener token |
 | `GET /api/v1/auth/me` | datos del usuario del token |
@@ -145,6 +146,37 @@ configurar CORS ni `VITE_API_URL`.
 | `GET /api/v1/tiendas` | dónde comprar, con filtros y paginación |
 | `GET /api/v1/grupos` | grupos y comunidades, con filtros y paginación |
 
+### Panel de administración
+
+En `/admin`, visible solo para cuentas con rol `administrador`. El backend
+vuelve a validar el rol en **cada** petición: la guarda de la interfaz es solo
+comodidad. Todas las rutas cuelgan de `/api/v1/admin` y el router completo
+lleva la dependencia `requiere_admin`, de modo que un endpoint nuevo nace
+protegido.
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /api/v1/admin/resumen` | contadores de toda la plataforma |
+| `GET /api/v1/admin/usuarios` | listado de cuentas |
+| `PATCH /api/v1/admin/usuarios/{id}` | activar o desactivar una cuenta |
+| `GET /api/v1/admin/contenido` | bandeja editorial con borradores |
+| `POST /api/v1/admin/contenido/{id}/publicar` | publicar |
+| `POST /api/v1/admin/contenido/{id}/rechazar` | rechazar un borrador |
+| `POST /api/v1/admin/contenido/{id}/borrador` | devolver a borrador |
+| `GET · POST /api/v1/admin/categorias` | categorías editoriales |
+| `GET · POST /api/v1/admin/eventos` | calendario y alta de eventos |
+| `DELETE /api/v1/admin/eventos/{id}` | eliminar un evento y sus inscripciones |
+| `GET /api/v1/admin/foro/temas` | todos los temas, incluidos los ocultos |
+| `PATCH /api/v1/admin/foro/temas/{id}` | abrir, cerrar u ocultar |
+| `GET · POST /api/v1/admin/desafios` | historial y alta de desafíos |
+| `POST /api/v1/admin/desafios/{id}/ganador` | elegir ganador |
+| `POST /api/v1/admin/tiendas` | dar de alta una tienda |
+| `POST /api/v1/admin/grupos` | dar de alta un grupo |
+
+Las transiciones editoriales están acotadas: `pendiente → publicado | rechazado`,
+`publicado → pendiente`, `rechazado → pendiente | publicado`. Un administrador
+no puede desactivar su propia cuenta.
+
 ## Frontend
 
 | Script | Qué hace |
@@ -169,10 +201,11 @@ quitan las barras finales antes de concatenar, para que un valor como
 cd backend && pytest
 ```
 
-121 pruebas sobre SQLite en un directorio temporal, con el esquema aplicado por
+136 pruebas sobre SQLite en un directorio temporal, con el esquema aplicado por
 la misma migración de producción. No tocan la base de desarrollo ni servicios
 externos. Cubren infraestructura, autenticación, autorización, directorio,
-contenido, los seis módulos nuevos y las semillas (incluida su idempotencia).
+contenido, los seis módulos nuevos, el panel de administración y las semillas
+(incluida su idempotencia).
 
 El recorrido extremo a extremo adicional se documenta en
 [`GUIA_DEMO.md`](GUIA_DEMO.md): migración, semillas, arranque y peticiones
@@ -311,9 +344,10 @@ La matriz completa de casos por requerimiento está en
 - **No hay refresh token.** Al vencer el token (60 min por defecto) hay que
   volver a iniciar sesión.
 - **El bloqueo es por correo, no por IP.** Se mitiga con la ventana de 15 min.
-- **Sin panel de administración visual.** Crear eventos, desafíos, elegir
-  ganador y publicar borradores se hace por la API (`/docs`); la interfaz
-  cubre el flujo de los usuarios finales.
+- **El panel de administración no cambia roles ni contraseñas.** Se evitó a
+  propósito: una escalada de privilegios por descuido es peor que tener que
+  usar SQL para promover una cuenta. Tampoco hay edición de contenidos ya
+  creados; el flujo es borrador → publicar/rechazar → volver a borrador.
 - **Sin carga de imágenes.** Los contenidos usan texto y HTML saneado; el
   portafolio del perfil es un enlace externo.
 - **Las cuentas demo son inseguras por diseño.** Solo para entornos de clase.

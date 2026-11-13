@@ -78,6 +78,21 @@ export function Encabezado() {
         <div className="hidden items-center gap-2 xl:flex">
           {usuario ? (
             <>
+              {usuario.rol === 'administrador' && (
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) =>
+                    [
+                      'rounded-control px-2.5 py-2 text-sm font-semibold',
+                      isActive
+                        ? 'bg-marca-700 text-white'
+                        : 'text-marca-700 hover:bg-marca-50',
+                    ].join(' ')
+                  }
+                >
+                  Administración
+                </NavLink>
+              )}
               <Link
                 to="/perfil"
                 className="rounded-control px-2.5 py-2 text-sm font-medium text-tinta-700 hover:bg-tinta-100"
@@ -148,6 +163,22 @@ export function Encabezado() {
               <li className="mt-2 border-t border-tinta-200 pt-2">
                 {usuario ? (
                   <div className="flex flex-col gap-1">
+                    {usuario.rol === 'administrador' && (
+                      <NavLink
+                        to="/admin"
+                        onClick={() => setAbierto(false)}
+                        className={({ isActive }) =>
+                          [
+                            'block rounded-control px-3 py-2 text-sm font-semibold',
+                            isActive
+                              ? 'bg-marca-700 text-white'
+                              : 'text-marca-700 hover:bg-marca-50',
+                          ].join(' ')
+                        }
+                      >
+                        Administración
+                      </NavLink>
+                    )}
                     <Link
                       to="/perfil"
                       onClick={() => setAbierto(false)}

@@ -28,7 +28,7 @@ cosplay-chile/
 │       │   └── routes/
 │       │       ├── health.py       GET /health
 │       │       ├── auth.py         registro, login, /me y /privacidad
-│       │       ├── admin.py        cuentas y bandeja editorial
+│       │       ├── admin.py        panel: métricas, editorial, eventos, foro, desafíos, comunidad
 │       │       ├── proveedores.py  US-13 directorio
 │       │       ├── contenido.py    US-08 contenido editorial
 │       │       ├── eventos.py      calendario y participaciones
@@ -56,7 +56,8 @@ cosplay-chile/
 │       │   ├── evento.py       eventos y participaciones
 │       │   ├── comunidad.py    temas, respuestas y desafíos
 │       │   ├── perfil.py       alta y actualización del perfil
-│       │   └── directorio.py   tiendas y grupos
+│       │   ├── directorio.py   tiendas y grupos
+│       │   └── admin.py        conteos y temas ocultos (solo panel)
 │       ├── schemas/
 │       │   ├── auth.py         entrada y salida de autenticación
 │       │   ├── proveedor.py    fichas del directorio
@@ -64,14 +65,16 @@ cosplay-chile/
 │       │   ├── evento.py       eventos y participaciones
 │       │   ├── comunidad.py    foro y desafíos
 │       │   ├── perfil.py       perfil público
-│       │   └── directorio.py   tiendas y grupos
+│       │   ├── directorio.py   tiendas y grupos
+│       │   └── admin.py        resumen y entradas del panel
 │       ├── services/
 │       │   ├── auth.py         registro, login y política de bloqueo
 │       │   ├── proveedor.py    reglas del directorio
 │       │   ├── contenido.py    ciclo editorial
 │       │   ├── evento.py       inscripciones y reglas del calendario
 │       │   ├── comunidad.py    reglas del foro y de los desafíos
-│       │   └── perfil.py       reglas del perfil público
+│       │   ├── perfil.py       reglas del perfil público
+│       │   └── admin.py        transiciones editoriales, moderación y altas
 │       ├── factories/
 │       │   └── contenido_factory.py  crea el subtipo correcto de Contenido
 │       └── seed/
@@ -99,6 +102,7 @@ cosplay-chile/
 │   │   ├── test_proveedores.py
 │   │   ├── test_contenido.py
 │   │   ├── test_modulos_nuevos.py    eventos, foro, desafíos, perfiles, catálogos
+│   │   ├── test_panel_admin.py       permisos, resumen, editorial, moderación y altas
 │   │   └── test_semilla_demo.py      idempotencia y bloqueo en producción
 │   └── exp/                          apuntes de exploración, no es código del producto
 └── frontend/
@@ -107,7 +111,7 @@ cosplay-chile/
     ├── .env.example
     └── src/
         ├── main.tsx                  monta React, el router y el proveedor de sesión
-        ├── App.tsx                   tabla de rutas (16 páginas)
+        ├── App.tsx                   tabla de rutas (17 páginas)
         ├── index.css                 tokens del sistema de diseño (@theme)
         ├── lib/
         │   ├── api.ts                cliente HTTP y tipos del backend
@@ -115,7 +119,8 @@ cosplay-chile/
         │   ├── contextoAuth.ts       contexto y hook useAuth
         │   ├── contenido.ts          etiquetas y tonos del contenido
         │   ├── etiquetas.ts          etiquetas del directorio
-        │   └── modulos.ts            cliente y tipos de los seis módulos nuevos
+        │   ├── modulos.ts            cliente y tipos de los seis módulos nuevos
+        │   └── admin.ts              cliente y tipos del panel de administración
         ├── components/
         │   ├── ui/                   Boton, Campo, Tarjeta, Etiqueta
         │   ├── layout/               Disposicion, Encabezado, Pie
@@ -134,6 +139,7 @@ cosplay-chile/
             ├── DesafiosPagina.tsx
             ├── ComunidadPagina.tsx
             ├── PerfilPagina.tsx
+            ├── AdminPagina.tsx       panel por pestañas, solo rol administrador
             ├── RegistroPagina.tsx
             ├── IngresarPagina.tsx
             ├── PrivacidadPagina.tsx
@@ -195,6 +201,14 @@ eso las tablas que ya estaban en `0001_esquema_inicial.py` (eventos, foro,
 desafíos, perfil, tiendas, grupos) pudieron activarse sin tocar el esquema ni
 añadir una migración nueva.
 
+El panel siguió el mismo corte (`schemas/admin.py`, `repositories/admin.py`,
+`services/admin.py`, `routes/admin.py`) con una salvedad de seguridad: su
+repositorio es **aparte** del público. La bandeja editorial necesita ver
+borradores y temas ocultos, mientras que `repositories/contenido.py` y
+`repositories/comunidad.py` los filtran a propósito. Poner una bandera
+`incluir_ocultos` en esos repositorios dejaría un interruptor olvidable en
+código que también sirve a visitantes anónimos.
+
 ## Estado de las historias
 
 | Historia | Estado | Archivos |
@@ -207,7 +221,8 @@ añadir una migración nueva.
 | Calendario de eventos | ✅ | `app/api/routes/eventos.py`, `frontend/src/pages/EventosPagina.tsx` |
 | Foro y desafíos | ✅ | `app/api/routes/comunidad.py`, `frontend/src/pages/ForoPagina.tsx` |
 | Perfil y complementos del directorio | ✅ | `app/api/routes/{perfiles,directorio}.py` |
-| EV4 pruebas funcionales y trazabilidad | ✅ | `tests/test_modulos_nuevos.py`, `tests/test_semilla_demo.py`, `tests/casos_por_rf.md` |
+| Panel de administración | ✅ | `app/api/routes/admin.py`, `app/services/admin.py`, `frontend/src/pages/AdminPagina.tsx` |
+| EV4 pruebas funcionales y trazabilidad | ✅ | `tests/test_modulos_nuevos.py`, `tests/test_panel_admin.py`, `tests/test_semilla_demo.py`, `tests/casos_por_rf.md` |
 
 ## Correspondencia con la vista de desarrollo
 

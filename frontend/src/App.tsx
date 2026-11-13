@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { AdminPagina } from './pages/AdminPagina'
 import { ComunidadPagina } from './pages/ComunidadPagina'
 import { ContenidoDetallePagina } from './pages/ContenidoDetallePagina'
 import { ContenidoPagina } from './pages/ContenidoPagina'
@@ -32,6 +33,7 @@ export default function App() {
       <Route path="/desafios" element={<DesafiosPagina />} />
       <Route path="/comunidad" element={<ComunidadPagina />} />
       <Route path="/perfil" element={<PerfilPagina />} />
+      <Route path="/admin" element={<AdminPagina />} />
       <Route path="/ingresar" element={<IngresarPagina />} />
       <Route path="/registro" element={<RegistroPagina />} />
       <Route path="/privacidad" element={<PrivacidadPagina />} />

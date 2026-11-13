@@ -1,7 +1,7 @@
 # Matriz de casos por requerimiento (EV4)
 
 Trazabilidad entre los requerimientos funcionales, el código que los implementa
-y las pruebas automatizadas que los verifican. Las 121 pruebas se ejecutan con
+y las pruebas automatizadas que los verifican. Las 136 pruebas se ejecutan con
 `pytest` desde `backend/` y no requieren servicios externos.
 
 Convención: `ID de caso` identifica la fila; `Archivo` es la prueba que la
@@ -87,14 +87,34 @@ cubre; `Resultado` es el estado observado en la última ejecución completa.
 | C-34 | El perfil de ejemplo es público | `app/seed/demo.py` | `test_el_perfil_de_ejemplo_es_publico` | ✅ |
 | C-35 | La semilla se rechaza en producción | `app/seed/demo.py` | `test_la_semilla_se_rechaza_en_produccion` | ✅ |
 
+## RF-10 · Panel de administración
+
+| Caso | Requerimiento | Implementación | Prueba | Resultado |
+|---|---|---|---|---|
+| C-36 | Las 16 rutas del panel están en OpenAPI | `app/api/routes/admin.py` | `test_las_rutas_del_panel_estan_en_openapi` | ✅ |
+| C-37 | Todos los endpoints nacen protegidos: 401 sin token, 403 sin rol | `app/api/routes/admin.py` | `test_todos_los_endpoints_nacen_protegidos` | ✅ |
+| C-38 | Los catálogos del panel coinciden con los modelos | `app/schemas/admin.py` | `test_los_catalogos_del_panel_coinciden_con_los_modelos` | ✅ |
+| C-39 | El resumen cuenta lo que hay en la base | `app/repositories/admin.py` | `test_resumen_cuenta_lo_que_hay_en_la_base` | ✅ |
+| C-40 | Bandeja ve borradores; publicar, rechazar y corregir | `app/services/admin.py` | `test_bandeja_ve_borradores_y_permite_publicar_rechazar_y_corregir` | ✅ |
+| C-41 | Transición sobre contenido inexistente da 404 | `app/services/admin.py` | `test_transicion_a_contenido_inexistente_devuelve_404` | ✅ |
+| C-42 | Un admin no puede desactivarse a sí mismo | `app/services/admin.py` | `test_admin_no_puede_desactivarse_a_si_mismo` | ✅ |
+| C-43 | Desactivar una cuenta le quita el acceso | `app/api/deps.py` | `test_desactivar_un_usuario_le_quita_el_acceso` | ✅ |
+| C-44 | Eliminar evento borra también las inscripciones | `app/repositories/admin.py` | `test_eliminar_evento_borra_tambien_las_inscripciones` | ✅ |
+| C-45 | Ocultar un tema lo saca del foro público y se puede reabrir | `app/services/admin.py` | `test_ocultar_un_tema_lo_saca_del_foro_publico_y_se_puede_reabrir` | ✅ |
+| C-46 | Estado de tema fuera de catálogo da 422 | `app/schemas/admin.py` | `test_estado_de_tema_fuera_de_catalogo_devuelve_422` | ✅ |
+| C-47 | Crear desafío y elegir ganador desde el panel | `app/api/routes/admin.py` | `test_crear_desafio_y_elegir_ganador_desde_el_panel` | ✅ |
+| C-48 | Alta de tienda y grupo valida duplicados y URLs | `app/schemas/admin.py` | `test_alta_de_tienda_y_grupo_valida_duplicados_y_urls` | ✅ |
+| C-49 | Crear categoría desde el panel | `app/api/routes/admin.py` | `test_crear_categoria_desde_el_panel` | ✅ |
+
 ## Verificación no automatizada (recorrido de demo)
 
 Además de las pruebas, se ejecutó un recorrido extremo a extremo real sobre
 SQLite con el esquema de Alembic: migración, semillas, arranque de uvicorn y
-15 peticiones HTTP (health, listados, login, perfil, inscripción, «mis
-eventos», respuesta en el foro, actualización de perfil con región vacía y
-OpenAPI con 29 rutas). **15/15 en verde.** El guion reproducible está en
-[`GUIA_DEMO.md`](../../GUIA_DEMO.md).
+26 comprobaciones HTTP (health, login de administrador y de cosplayer, 401/403
+del panel, resumen, bandeja editorial con publicar/rechazar/borrador, alta y
+baja de eventos, moderación del foro, desafíos, tiendas, grupos, rechazo de
+URLs `javascript:` y OpenAPI con 43 rutas). **26/26 en verde.** El guion
+reproducible está en [`GUIA_DEMO.md`](../../GUIA_DEMO.md).
 
 ## Resumen
 
@@ -105,4 +125,5 @@ OpenAPI con 29 rutas). **15/15 en verde.** El guion reproducible está en
 | Directorio y contenido | 37 |
 | Módulos nuevos | 18 |
 | Semillas de demostración | 7 |
-| **Total** | **121** |
+| Panel de administración | 15 |
+| **Total** | **136** |
