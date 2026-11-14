@@ -236,12 +236,34 @@ Tres formas, de menos a más drástica:
 | Forma | Cuándo usarla | Cómo |
 |---|---|---|
 | **Rollback en Render** | Solo quieres volver a la versión anterior ya desplegada, sin tocar Git | Panel de Render → servicio → pestaña **Deploys** → elegir el deploy anterior → **Redeploy**. Es instantáneo y no cambia el repo |
-| **`git revert`** (recomendado en Git) | Quieres que `main` quede limpio y que Render vuelva a desplegar solo | `git checkout main && git revert -m 1 94f8b2c0 && git push origin main` |
-| **Restaurar el respaldo** | Quieres exactamente el estado previo, sin historial del intento | `git checkout main && git reset --hard backup-pre-demo-admin && git push --force-with-lease origin main` |
+| **Restaurar el respaldo** (lo más simple para volver del todo) | Quieres exactamente el estado previo | `git checkout main && git reset --hard backup-pre-demo-admin && git push --force-with-lease origin main` |
+| **`git revert`** | Quieres conservar el historial y que Render redespliegue solo | Ver la secuencia de abajo |
+
+> **Ojo con el `git revert`.** El merge del PR es `94f8b2c`, pero después se
+> subieron cuatro commits directos a `main` (`95fed8a`, `078a7ed`, `1e17741` y
+> `3c76c06`: despliegue, nombres de cuentas y documentación). Hacer solo
+> `git revert -m 1 94f8b2c0` quita la plataforma pero **deja esos cuatro**.
+> La secuencia completa, en orden inverso, se probó y deja el árbol idéntico
+> al respaldo `bcef3c4`:
+>
+> ```bash
+> git checkout main && git pull --ff-only
+> git revert --no-edit 3c76c06
+> git revert --no-edit 1e17741
+> git revert --no-edit 078a7ed
+> git revert --no-edit 95fed8a
+> git revert -m 1 --no-edit 94f8b2c0
+> git push origin main
+> ```
+>
+> Importante: ejecútala con el árbol limpio (`git status` sin cambios). Si hay
+> archivos sin commitear, el primer revert se aborta y los siguientes producen
+> conflictos `modify/delete`; en ese caso `git revert --abort`, guarda tus
+> cambios y vuelve a empezar. Para una demo, el rollback de Render o restaurar
+> el respaldo son más rápidos.
 
 > Evita `reset --hard` + push forzado si alguien más usa el repo: reescribe el
-> historial compartido. Para una demo, `git revert` o el rollback de Render
-> alcanzan. Tanto la rama `backup/pre-demo-admin` como la etiqueta
+> historial compartido. Tanto la rama `backup/pre-demo-admin` como la etiqueta
 > `backup-pre-demo-admin` **ya están publicadas en GitHub**, así que el respaldo
 > sobrevive aunque borres el clon local o trabajes solo desde el móvil.
 
@@ -252,13 +274,29 @@ punto antes.
 
 ---
 
-## Seguridad: revoca el token de GitHub
+## Después de la clase: cierre obligatorio
 
-El token de acceso personal que usaste para crear el PR y llevar los cambios
-a `main` debe revocarse en cuanto termines:
-https://github.com/settings/personal-access-tokens → **Revoke**. Tenía
-caducidad corta y permisos limitados a este repositorio, y no se guardó en
-ningún archivo del proyecto.
+**Esto es lo único que falta por hacer.** Mientras la demo esté montada, la
+contraseña `Demo2026!` es pública y hay una cuenta `administrador` accesible
+desde internet. En cuanto termines:
+
+1. En **Environment** de `cosplay-chile-api`, cambia `DEMO_SEED` a `0` y haz
+   **Manual Deploy → Deploy latest commit**. Sin esto, cada arranque vuelve a
+   crear las cuentas demo aunque las borres a mano (el `startCommand` tiene
+   `export DEMO_SEED="${DEMO_SEED:-1}"`, así que dejar la variable vacía no
+   basta).
+2. **Borra las tres cuentas demo de la base** o cámbiales la contraseña.
+   Borrarlas sin el paso 1 no sirve: se recrean en el próximo despliegue.
+3. **Revoca el token de GitHub**: https://github.com/settings/personal-access-tokens
+   → **Revoke**. Tenía caducidad corta y permisos limitados a este repositorio,
+   y no se guardó en ningún archivo del proyecto.
+4. Revisa la base de producción: además de las tres cuentas demo hay una
+   cuenta real registrada a mano (`mariajperezc@gmail.com`). Si la creaste tú
+   probando el formulario, bórrala si no la vas a usar.
+5. Si quieres dejar `render.yaml` seguro para el futuro, cambia el valor de
+   `DEMO_SEED` a `"0"` y quita el `export DEMO_SEED="${DEMO_SEED:-1}"` del
+   `startCommand`. Hoy está en `1` a propósito para que la entrega en clases
+   funcione sin configurar nada.
 
 Las cuentas `demo@cosplay.cl` y compañía son deliberadamente inseguras: no las
 dejes activas en un despliegue público después de la clase.
