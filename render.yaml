@@ -43,6 +43,13 @@ services:
       # por CORS en producción.
       - key: CORS_ORIGINS
         sync: false
+      # Adaptador de archivos. En el plan free el disco es efímero: las
+      # imágenes de la demo se sirven desde /tmp. Para persistencia real
+      # cambiar a cloudinary y cargar las tres credenciales a mano.
+      - key: STORAGE_BACKEND
+        value: local
+      - key: STORAGE_DIRECTORIO
+        value: /tmp/cosplay-archivos
 
   # --- Frontend --------------------------------------------------------
   # Sitio estático: Render compila con Vite y publica dist/. No ejecuta

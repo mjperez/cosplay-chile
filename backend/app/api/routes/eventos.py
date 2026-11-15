@@ -121,8 +121,12 @@ def participaciones_evento(
     summary="Crear un evento (solo administrador)",
     dependencies=[Depends(requiere_admin)],
 )
-def crear_evento(datos: EventoEntrada, sesion: Session = Depends(get_db)) -> EventoPublico:
-    evento = servicio.crear(sesion, datos)
+def crear_evento(
+    datos: EventoEntrada,
+    usuario: Usuario = Depends(get_usuario_actual),
+    sesion: Session = Depends(get_db),
+) -> EventoPublico:
+    evento = servicio.crear(sesion, datos, id_actor=usuario.id_usuario)
     return _publico(sesion, evento)
 
 

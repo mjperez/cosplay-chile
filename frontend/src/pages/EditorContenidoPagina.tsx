@@ -1,13 +1,14 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 
 import { Disposicion } from '../components/layout/Disposicion'
 import { Boton } from '../components/ui/Boton'
 import { Campo } from '../components/ui/Campo'
 import { api, ErrorApi, type Categoria, type Contenido, type TipoContenido } from '../lib/api'
+import { archivosApi, type ArchivoPublico } from '../lib/archivos'
 import { useAuth } from '../lib/contextoAuth'
 import { ETIQUETAS_CONTENIDO } from '../lib/contenido'
-import { useEffect } from 'react'
+import { mensajeDeFallo } from '../lib/modulos'
 
 /** Convierte un textarea en lista: una entrada por línea, sin vacías. */
 function lineas(texto: string): string[] {
@@ -40,10 +41,13 @@ export function EditorContenidoPagina() {
   const [tipo, setTipo] = useState<TipoContenido>('guia')
   const [titulo, setTitulo] = useState('')
   const [resumen, setResumen] = useState('')
-  const [nivel, setNivel] = useState('basico')
+  const [nivel, setNivel] = useState<Contenido['nivel']>('basico')
   const [idCategoria, setIdCategoria] = useState('')
   const [cuerpo, setCuerpo] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
+  const [imagenes, setImagenes] = useState<ArchivoPublico[]>([])
+  const [subiendo, setSubiendo] = useState(false)
+  const [errorImagen, setErrorImagen] = useState('')
 
   const [personaje, setPersonaje] = useState('')
   const [medidasTexto, setMedidasTexto] = useState('')
@@ -89,6 +93,40 @@ export function EditorContenidoPagina() {
     return <Navigate to="/ingresar" state={{ desde: '/contenido/nuevo' }} replace />
   }
 
+  /**
+   * La imagen se sube ANTES de guardar el contenido: el backend sólo acepta
+   * URL (`HttpUrl`), nunca el binario. El Adapter valida tipo real, tamaño y
+   * devuelve un enlace absoluto que se adjunta en `imagenes`.
+   */
+  async function alElegirImagen(evento: ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0]
+    evento.target.value = '' // permite volver a elegir el mismo archivo
+    if (!archivo) return
+    setErrorImagen('')
+    setSubiendo(true)
+    try {
+      const subida = await archivosApi.subir(archivo)
+      setImagenes((anteriores) => [...anteriores, subida])
+    } catch (fallo) {
+      setErrorImagen(mensajeDeFallo(fallo, 'No pudimos subir la imagen.'))
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  async function quitarImagen(indice: number) {
+    const imagen = imagenes[indice]
+    setErrorImagen('')
+    // Si el borrado remoto falla, el enlace se retira igual del borrador para
+    // no dejar al usuario atrapado con una imagen que ya no quiere.
+    try {
+      await archivosApi.eliminar(imagen.identificador)
+    } catch {
+      setErrorImagen('La imagen se quitó del borrador, pero no se pudo borrar del servidor.')
+    }
+    setImagenes((anteriores) => anteriores.filter((_, i) => i !== indice))
+  }
+
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     setError('')
@@ -101,6 +139,7 @@ export function EditorContenidoPagina() {
       nivel,
       id_categoria: idCategoria || null,
       cuerpo: cuerpo.trim() || null,
+      imagenes: imagenes.length ? imagenes.map((imagen) => imagen.enlace) : null,
       video_url: videoUrl.trim() || null,
     }
 
@@ -154,6 +193,23 @@ export function EditorContenidoPagina() {
           <p className="mt-3 text-sm leading-relaxed text-tinta-600">
             «{creado.titulo}» quedó como borrador. No aparece en el listado público
             hasta que un administrador lo publique.
+          </p>
+          {imagenes.length > 0 && (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {imagenes.map((imagen, indice) => (
+                <img
+                  key={imagen.identificador}
+                  src={imagen.enlace}
+                  alt={`Imagen adjunta ${indice + 1}`}
+                  className="h-20 w-20 rounded-control border border-tinta-200 object-cover"
+                />
+              ))}
+            </div>
+          )}
+          <p className="mt-5 rounded-control bg-marca-50 px-3 py-2 text-xs leading-relaxed text-marca-800">
+            El envío a revisión generó avisos internos, el correo a moderación
+            quedó en la bandeja de salida y la acción se registró en la bitácora
+            de auditoría.
           </p>
 
           {error && (
@@ -245,7 +301,7 @@ export function EditorContenidoPagina() {
               <select
                 id="nivel"
                 value={nivel}
-                onChange={(evento) => setNivel(evento.target.value)}
+                onChange={(evento) => setNivel(evento.target.value as Contenido['nivel'])}
                 className="rounded-control border border-tinta-300 bg-white px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-600"
               >
                 <option value="basico">Básico</option>
@@ -289,6 +345,50 @@ export function EditorContenidoPagina() {
             <p className="text-xs text-tinta-500">
               Se muestra sanitizado en la vista pública.
             </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="imagenes" className="text-sm font-medium text-tinta-800">
+              Imágenes (opcional)
+            </label>
+            <input
+              id="imagenes"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={subiendo || imagenes.length >= 10}
+              onChange={(evento) => { void alElegirImagen(evento) }}
+              className="block w-full text-sm text-tinta-700 file:mr-3 file:rounded-control file:border file:border-tinta-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-tinta-100"
+            />
+            <p className="text-xs text-tinta-500" role="status">
+              {subiendo
+                ? 'Subiendo imagen…'
+                : 'PNG, JPEG o WebP, hasta 5 MB. Máximo 10 imágenes. Se valida el contenido real del archivo.'}
+            </p>
+            {errorImagen && (
+              <p role="alert" className="rounded-control bg-error-50 px-3 py-2 text-sm text-error-600">
+                {errorImagen}
+              </p>
+            )}
+            {imagenes.length > 0 && (
+              <ul className="mt-2 flex flex-wrap gap-3">
+                {imagenes.map((imagen, indice) => (
+                  <li key={imagen.identificador} className="flex flex-col items-center gap-1.5">
+                    <img
+                      src={imagen.enlace}
+                      alt={`Imagen adjunta ${indice + 1}`}
+                      className="h-20 w-20 rounded-control border border-tinta-200 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { void quitarImagen(indice) }}
+                      className="text-xs text-error-600 underline hover:no-underline"
+                    >
+                      Quitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <Campo
@@ -465,7 +565,7 @@ export function EditorContenidoPagina() {
             </p>
           )}
 
-          <Boton type="submit" cargando={enviando} tamano="lg">
+          <Boton type="submit" cargando={enviando} disabled={subiendo} tamano="lg">
             {enviando ? 'Guardando' : 'Guardar como borrador'}
           </Boton>
         </form>

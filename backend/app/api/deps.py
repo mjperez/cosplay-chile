@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.adapters.almacenamiento import IAlmacenamientoArchivos, obtener_almacenamiento
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.core.security import decodificar_token
@@ -76,3 +77,13 @@ def requiere_roles(*roles: str) -> Callable[..., Usuario]:
 
 
 requiere_admin = requiere_roles("administrador")
+
+
+def get_almacenamiento() -> IAlmacenamientoArchivos:
+    """Inyecta el adaptador concreto; los tests pueden sustituirlo.
+
+    Es el único punto de composición del patrón Adapter: los endpoints ven la
+    interfaz, y `app.dependency_overrides` permite probarlos sin tocar disco
+    ni credenciales externas.
+    """
+    return obtener_almacenamiento()

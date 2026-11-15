@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 import { useAuth } from '../../lib/contextoAuth'
+import { notificacionesApi } from '../../lib/notificaciones'
 import { Boton } from '../ui/Boton'
 
 /** Módulos de la plataforma. Todos tienen pantalla implementada. */
@@ -17,6 +18,20 @@ const MODULOS: { nombre: string; to: string }[] = [
 export function Encabezado() {
   const { usuario, cerrarSesion } = useAuth()
   const [abierto, setAbierto] = useState(false)
+  const [sinLeer, setSinLeer] = useState(0)
+
+  useEffect(() => {
+    if (!usuario) {
+      queueMicrotask(() => setSinLeer(0))
+      return
+    }
+    queueMicrotask(() => {
+      notificacionesApi
+        .sinLeer()
+        .then((dato) => setSinLeer(dato.sin_leer))
+        .catch(() => setSinLeer(0))
+    })
+  }, [usuario])
 
   return (
     <header className="sticky top-0 z-40 border-b border-tinta-200 bg-white/90 backdrop-blur">
@@ -93,6 +108,27 @@ export function Encabezado() {
                   Administración
                 </NavLink>
               )}
+              <NavLink
+                to="/notificaciones"
+                className={({ isActive }) =>
+                  [
+                    'rounded-control px-2.5 py-2 text-sm font-medium',
+                    isActive
+                      ? 'bg-marca-50 text-marca-800'
+                      : 'text-tinta-700 hover:bg-tinta-100',
+                  ].join(' ')
+                }
+              >
+                Avisos
+                {sinLeer > 0 && (
+                  <span
+                    aria-label={`${sinLeer} avisos sin leer`}
+                    className="ml-1.5 inline-grid min-w-5 place-items-center rounded-full bg-marca-700 px-1.5 py-0.5 text-xs font-bold text-white"
+                  >
+                    {sinLeer}
+                  </span>
+                )}
+              </NavLink>
               <Link
                 to="/perfil"
                 className="rounded-control px-2.5 py-2 text-sm font-medium text-tinta-700 hover:bg-tinta-100"
@@ -179,6 +215,20 @@ export function Encabezado() {
                         Administración
                       </NavLink>
                     )}
+                    <NavLink
+                      to="/notificaciones"
+                      onClick={() => setAbierto(false)}
+                      className={({ isActive }) =>
+                        [
+                          'block rounded-control px-3 py-2 text-sm font-medium',
+                          isActive
+                            ? 'bg-marca-50 text-marca-800'
+                            : 'text-tinta-700 hover:bg-tinta-100',
+                        ].join(' ')
+                      }
+                    >
+                      Avisos{sinLeer > 0 ? ` (${sinLeer} sin leer)` : ''}
+                    </NavLink>
                     <Link
                       to="/perfil"
                       onClick={() => setAbierto(false)}

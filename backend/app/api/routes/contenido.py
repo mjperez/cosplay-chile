@@ -122,7 +122,8 @@ def obtener_contenido(
     dependencies=[Depends(requiere_admin)],
 )
 def publicar_contenido(
-    id_contenido: uuid.UUID, sesion: Session = Depends(get_db)
+    id_contenido: uuid.UUID,
+    sesion: Session = Depends(get_db),
 ) -> object:
     try:
         contenido = servicio.publicar(sesion, id_contenido)

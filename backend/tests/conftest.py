@@ -27,9 +27,14 @@ os.environ["ENVIRONMENT"] = "test"
 os.environ["DB_ECHO"] = "false"
 # bcrypt con costo 12 tarda unos 250 ms por hash. En pruebas no aporta nada.
 os.environ["BCRYPT_ROUNDS"] = "4"
+# El adaptador local escribe en un directorio temporal de la sesión de pruebas.
+os.environ["STORAGE_DIRECTORIO"] = str(_DIR_TEMPORAL / "archivos")
 
 # Orden inverso de dependencias para poder borrar sin violar claves foráneas.
 TABLAS = [
+    # Primero las tablas del Observer: notificacion apunta a usuario.
+    "notificacion",
+    "bitacora_auditoria",
     "foro_respuesta",
     "foro_tema",
     "desafio_mensual",

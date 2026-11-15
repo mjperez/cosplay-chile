@@ -13,6 +13,7 @@ import { ForoPagina } from './pages/ForoPagina'
 import { InicioPagina } from './pages/InicioPagina'
 import { IngresarPagina } from './pages/IngresarPagina'
 import { NoEncontradaPagina } from './pages/NoEncontradaPagina'
+import { NotificacionesPagina } from './pages/NotificacionesPagina'
 import { PerfilPagina } from './pages/PerfilPagina'
 import { PrivacidadPagina } from './pages/PrivacidadPagina'
 import { RegistroPagina } from './pages/RegistroPagina'
@@ -33,6 +34,7 @@ export default function App() {
       <Route path="/desafios" element={<DesafiosPagina />} />
       <Route path="/comunidad" element={<ComunidadPagina />} />
       <Route path="/perfil" element={<PerfilPagina />} />
+      <Route path="/notificaciones" element={<NotificacionesPagina />} />
       <Route path="/admin" element={<AdminPagina />} />
       <Route path="/ingresar" element={<IngresarPagina />} />
       <Route path="/registro" element={<RegistroPagina />} />

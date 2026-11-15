@@ -112,6 +112,24 @@ export interface PaginaContenido {
   elementos: Contenido[]
 }
 
+/**
+ * Cuerpo del POST de contenido. Los campos propios de cada tipo (guía,
+ * entrevista, artículo) se agregan dinámicamente en el editor; el backend los
+ * discrimina con `tipo`. `imagenes` son las URL absolutas que devuelve el
+ * Adapter de almacenamiento, no archivos en base64.
+ */
+export interface DatosContenido {
+  tipo: TipoContenido
+  titulo: string
+  resumen: string | null
+  nivel: Contenido['nivel']
+  id_categoria: string | null
+  cuerpo: string | null
+  imagenes: string[] | null
+  video_url: string | null
+  [clave: string]: unknown
+}
+
 export interface Categoria {
   id_categoria: string
   nombre: string
@@ -229,7 +247,7 @@ export const api = {
 
   categorias: () => peticion<Categoria[]>('/api/v1/contenido/categorias'),
 
-  crearContenido: (datos: Record<string, unknown>) =>
+  crearContenido: (datos: DatosContenido) =>
     peticion<Contenido>('/api/v1/contenido', {
       method: 'POST',
       body: JSON.stringify(datos),

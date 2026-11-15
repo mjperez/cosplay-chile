@@ -185,9 +185,13 @@ def desafio_vigente(sesion: Session = Depends(get_db)) -> DesafioPublico | None:
     summary="Crear un desafío mensual (solo administrador)",
     dependencies=[Depends(requiere_admin)],
 )
-def crear_desafio(datos: DesafioEntrada, sesion: Session = Depends(get_db)) -> DesafioPublico:
+def crear_desafio(
+    datos: DesafioEntrada,
+    usuario: Usuario = Depends(get_usuario_actual),
+    sesion: Session = Depends(get_db),
+) -> DesafioPublico:
     try:
-        fila = servicio.crear_desafio(sesion, datos)
+        fila = servicio.crear_desafio(sesion, datos, id_actor=usuario.id_usuario)
     except servicio.MesDuplicado as error:
         raise HTTPException(409, f"ya existe un desafío para {error.mes}")
     return _desafio(*fila)

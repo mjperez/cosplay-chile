@@ -209,7 +209,13 @@ export async function peticionModulo<T>(
   opciones: RequestInit = {},
 ): Promise<T> {
   const cabeceras = new Headers(opciones.headers)
-  if (opciones.body && !cabeceras.has('Content-Type')) {
+  // Con FormData el navegador debe poner el boundary; forzar application/json
+  // rompería la subida de imágenes del módulo de contenidos.
+  if (
+    opciones.body &&
+    !(opciones.body instanceof FormData) &&
+    !cabeceras.has('Content-Type')
+  ) {
     cabeceras.set('Content-Type', 'application/json')
   }
   const token = localStorage.getItem(CLAVE_TOKEN)

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.events.gestor import EventoDominio, emitir
 from app.factories.contenido_factory import ContenidoFactory, TipoContenidoInvalido
 from app.models.contenido import CategoriaContenido, Contenido
 from app.models.usuario import Usuario
@@ -60,12 +61,26 @@ def _validar_categoria(sesion: Session, id_categoria: uuid.UUID | None) -> None:
 
 
 def crear(sesion: Session, datos: ContenidoEntrada, autor: Usuario) -> Contenido:
-    """Crea el contenido en estado borrador usando el Factory Method."""
+    """Crea el contenido en estado borrador usando el Factory Method.
+
+    Además emite `contenido_enviado_revision`: el Observer avisa al autor y a
+    moderación sin que este servicio sepa que existen notificaciones, correos
+    o una bitácora.
+    """
     _validar_categoria(sesion, datos.id_categoria)
 
     contenido = ContenidoFactory.crear(datos, autor.id_usuario)
     sesion.add(contenido)
     sesion.flush()
+    emitir(
+        EventoDominio(
+            tipo="contenido_enviado_revision",
+            id_actor=autor.id_usuario,
+            id_recurso=contenido.id_contenido,
+            detalle={"titulo": contenido.titulo, "id_autor": str(autor.id_usuario)},
+        ),
+        sesion=sesion,
+    )
     return contenido
 
 
@@ -81,6 +96,14 @@ def publicar(sesion: Session, id_contenido: uuid.UUID) -> Contenido:
     contenido.estado = "publicado"
     contenido.fecha_publicacion = datetime.now(timezone.utc)
     sesion.flush()
+    emitir(
+        EventoDominio(
+            tipo="contenido_publicado",
+            id_recurso=contenido.id_contenido,
+            detalle={"titulo": contenido.titulo, "id_autor": str(contenido.id_autor)},
+        ),
+        sesion=sesion,
+    )
     return contenido
 
 

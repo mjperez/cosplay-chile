@@ -9,7 +9,9 @@ cada módulo y la regla de dependencia que lo mantiene ordenado.
 cosplay-chile/
 ├── .gitattributes
 ├── .gitignore
-├── README.md                  puesta en marcha, API, despliegue y trazabilidad
+├── .github/workflows/ci.yml    pipeline CI: pytest+cobertura, lint, build
+├── README.md                  puesta en marcha, API, patrones, despliegue y trazabilidad
+├── CORRECCIONES_ES3.md        evidencia de correcciones (rúbrica 3.1.5)
 ├── GUIA_DEMO.md               guion para exponer la plataforma en clases
 ├── estructura.md              este archivo
 ├── render.yaml                dos servicios: API + sitio estático
@@ -17,8 +19,10 @@ cosplay-chile/
 │   ├── .env.example
 │   ├── alembic.ini
 │   ├── pytest.ini
-│   ├── requirements.txt
-│   ├── requirements-dev.txt
+│   ├── requirements.txt       solo ejecución
+│   ├── requirements-dev.txt   añade pytest, httpx y pytest-cov
+│   ├── scripts/
+│   │   └── recorrido_http.py  smoke real sobre uvicorn (51 comprobaciones)
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py            fábrica de la aplicación FastAPI
@@ -34,7 +38,9 @@ cosplay-chile/
 │       │       ├── eventos.py      calendario y participaciones
 │       │       ├── comunidad.py    foro y desafíos mensuales
 │       │       ├── perfiles.py     perfil público de cosplayer
-│       │       └── directorio.py   tiendas y grupos
+│       │       ├── directorio.py   tiendas y grupos
+│       │       ├── notificaciones.py  avisos internos y contador sin leer
+│       │       └── archivos.py       subida y borrado de imágenes (Adapter)
 │       ├── core/
 │       │   ├── config.py       Settings desde variables de entorno
 │       │   ├── database.py     DatabaseSessionManager (Singleton) y get_db
@@ -47,7 +53,13 @@ cosplay-chile/
 │       │   ├── evento.py       EventoCosplay, ParticipacionEvento
 │       │   ├── directorio.py   Proveedor, DondeComprar, ComunidadGrupo
 │       │   ├── comunidad.py    ForoTema, ForoRespuesta, DesafioMensual
+│       │   ├── notificacion.py Notificacion y BitacoraAuditoria (sin FK a usuario)
 │       │   └── intento_login.py contador para el bloqueo por fuerza bruta
+│       ├── events/
+│       │   ├── gestor.py       GestorEventos (Observer) y catálogo cerrado de 4 eventos
+│       │   └── observadores.py NotificacionInterna, CorreoModerador, RegistroAuditoria
+│       ├── adapters/
+│       │   └── almacenamiento.py  IAlmacenamientoArchivos + Local + Cloudinary
 │       ├── repositories/
 │       │   ├── usuario.py      consultas de usuarios
 │       │   ├── intento_login.py consultas de intentos
@@ -57,6 +69,7 @@ cosplay-chile/
 │       │   ├── comunidad.py    temas, respuestas y desafíos
 │       │   ├── perfil.py       alta y actualización del perfil
 │       │   ├── directorio.py   tiendas y grupos
+│       │   ├── notificacion.py avisos y bitácora de auditoría
 │       │   └── admin.py        conteos y temas ocultos (solo panel)
 │       ├── schemas/
 │       │   ├── auth.py         entrada y salida de autenticación
@@ -66,6 +79,8 @@ cosplay-chile/
 │       │   ├── comunidad.py    foro y desafíos
 │       │   ├── perfil.py       perfil público
 │       │   ├── directorio.py   tiendas y grupos
+│       │   ├── archivo.py      respuesta de la subida de imágenes
+│       │   ├── notificacion.py avisos, resumen y registros de auditoría
 │       │   └── admin.py        resumen y entradas del panel
 │       ├── services/
 │       │   ├── auth.py         registro, login y política de bloqueo
@@ -74,6 +89,7 @@ cosplay-chile/
 │       │   ├── evento.py       inscripciones y reglas del calendario
 │       │   ├── comunidad.py    reglas del foro y de los desafíos
 │       │   ├── perfil.py       reglas del perfil público
+│       │   ├── archivos.py     whitelist, magic bytes, tamaño e identificador
 │       │   └── admin.py        transiciones editoriales, moderación y altas
 │       ├── factories/
 │       │   └── contenido_factory.py  crea el subtipo correcto de Contenido
@@ -87,7 +103,10 @@ cosplay-chile/
 │   │   ├── script.py.mako
 │   │   └── versions/
 │   │       ├── 0001_esquema_inicial.py
-│   │       └── 0002_intentos_login.py
+│   │       ├── 0002_intentos_login.py
+│   │       ├── 0003_proveedor_region_opcional.py
+│   │       ├── 0004_contenido_enriquecido.py
+│   │       └── 0005_observer_notificaciones_auditoria.py  aditiva: 2 tablas
 │   ├── tests/
 │   │   ├── conftest.py               esquema por Alembic y limpieza por prueba
 │   │   ├── casos_por_rf.md           matriz de casos por requerimiento (EV4)
@@ -103,6 +122,8 @@ cosplay-chile/
 │   │   ├── test_contenido.py
 │   │   ├── test_modulos_nuevos.py    eventos, foro, desafíos, perfiles, catálogos
 │   │   ├── test_panel_admin.py       permisos, resumen, editorial, moderación y altas
+│   │   ├── test_observer.py          13 pruebas: 3 observadores, 4 eventos, bitácora
+│   │   ├── test_adapter.py           18 pruebas: interfaz, disco, nube, whitelist, HTTP
 │   │   └── test_semilla_demo.py      idempotencia, nombres por rol, bloqueo en prod.
 │   └── exp/                          apuntes de exploración, no es código del producto
 └── frontend/
@@ -111,7 +132,7 @@ cosplay-chile/
     ├── .env.example
     └── src/
         ├── main.tsx                  monta React, el router y el proveedor de sesión
-        ├── App.tsx                   tabla de rutas (17 páginas)
+        ├── App.tsx                   tabla de rutas (18 páginas)
         ├── index.css                 tokens del sistema de diseño (@theme)
         ├── lib/
         │   ├── api.ts                cliente HTTP y tipos del backend
@@ -120,7 +141,9 @@ cosplay-chile/
         │   ├── contenido.ts          etiquetas y tonos del contenido
         │   ├── etiquetas.ts          etiquetas del directorio
         │   ├── modulos.ts            cliente y tipos de los seis módulos nuevos
-        │   └── admin.ts              cliente y tipos del panel de administración
+        │   ├── notificaciones.ts     avisos internos y contador sin leer
+        │   ├── archivos.ts           subida multipart (FormData) y borrado
+        │   └── admin.ts              cliente, bitácora y tipos del panel
         ├── components/
         │   ├── ui/                   Boton, Campo, Tarjeta, Etiqueta
         │   ├── layout/               Disposicion, Encabezado, Pie
@@ -139,7 +162,8 @@ cosplay-chile/
             ├── DesafiosPagina.tsx
             ├── ComunidadPagina.tsx
             ├── PerfilPagina.tsx
-            ├── AdminPagina.tsx       panel por pestañas, solo rol administrador
+            ├── NotificacionesPagina.tsx  bandeja de avisos con "marcar leída"
+            ├── AdminPagina.tsx       panel por pestañas + Auditoría, solo administrador
             ├── RegistroPagina.tsx
             ├── IngresarPagina.tsx
             ├── PrivacidadPagina.tsx
@@ -161,6 +185,8 @@ nuevo, se declara ahí y se usa por nombre (por ejemplo `--color-exito-100`).
 | `app/services` | reglas de negocio y transacciones | no conoce HTTP ni serializa |
 | `app/api/routes` | contrato HTTP: rutas, códigos, dependencias | no escribe SQL ni decide reglas |
 | `app/factories` | construye la entidad correcta según el tipo | no valida ni persiste |
+| `app/events` | sujeto observable, catálogo de eventos y observadores | no decide cuándo ocurre el evento de negocio |
+| `app/adapters` | traduce la interfaz de almacenamiento al proveedor concreto | no conoce endpoints ni reglas editoriales |
 | `app/seed` | carga datos iniciales de forma idempotente | no define reglas de negocio |
 | `migrations` | evolución del esquema | no crea datos de negocio |
 | `tests` | verifica criterios de aceptación | no depende de servicios externos |
@@ -177,9 +203,13 @@ La flecha significa «puede importar». Se cumple en un solo sentido:
 
 - `models` no importa nada de `api`, `services` ni `repositories`.
 - `repositories` no importa nada de `services` ni de `api`.
-- `services` no importa nada de `api`.
+- `services` no importa nada de `api`, pero sí puede emitir hacia `app/events`.
+- `app/events` y `app/adapters` son transversales: los observadores reciben la
+  `Session` del servicio y hablan con `repositories`; el adaptador se inyecta
+  desde `api/deps.py` y nunca es importado directamente por una ruta.
 - `api` puede importar todo lo anterior.
-- `main.py` solo compone: no contiene lógica.
+- `main.py` solo compone: no contiene lógica (registra routers, monta
+  `/archivos` y llama a `configurar_observadores()` en el `lifespan`).
 
 Si aparece un import que va contra la flecha, la solución no es moverlo: es
 crear la capa que falta, no romper el orden.
@@ -222,7 +252,16 @@ código que también sirve a visitantes anónimos.
 | Foro y desafíos | ✅ | `app/api/routes/comunidad.py`, `frontend/src/pages/ForoPagina.tsx` |
 | Perfil y complementos del directorio | ✅ | `app/api/routes/{perfiles,directorio}.py` |
 | Panel de administración | ✅ | `app/api/routes/admin.py`, `app/services/admin.py`, `frontend/src/pages/AdminPagina.tsx` |
-| EV4 pruebas funcionales y trazabilidad | ✅ | `tests/test_modulos_nuevos.py`, `tests/test_panel_admin.py`, `tests/test_semilla_demo.py`, `tests/casos_por_rf.md` |
+| **ES3 · Observer: avisos, correo y auditoría (RF-37)** | ✅ | `app/events/`, `app/models/notificacion.py`, `routes/notificaciones.py`, `frontend/src/pages/NotificacionesPagina.tsx` |
+| **ES3 · Adapter: imágenes (RF-18/RF-27)** | ✅ | `app/adapters/`, `app/services/archivos.py`, `routes/archivos.py`, `frontend/src/lib/archivos.ts` |
+| **ES3 · CI/CD, entornos y evidencia 3.1.5** | ✅ | `.github/workflows/ci.yml`, `render.yaml`, `CORRECCIONES_ES3.md`, `scripts/recorrido_http.py` |
+| EV4 pruebas funcionales y trazabilidad | ✅ | `tests/test_modulos_nuevos.py`, `tests/test_panel_admin.py`, `tests/test_semilla_demo.py`, `tests/test_observer.py`, `tests/test_adapter.py`, `tests/casos_por_rf.md` |
+
+**169 pruebas** en verde, **96% de cobertura**, **49 rutas** en OpenAPI y
+**51/51 comprobaciones** en el recorrido HTTP real. Los cuatro patrones
+comprometidos en el ES2 (Singleton, Factory Method, Observer, Adapter) están
+implementados y se verifican juntos en
+`test_los_cuatro_patrones_del_informe_estan_implementados`.
 
 ## Correspondencia con la vista de desarrollo
 
@@ -233,6 +272,8 @@ código que también sirve a visitantes anónimos.
 | `app/models` | Modelo de dominio |
 | `migrations` | Esquema de base de datos |
 | `app/seed` | Carga inicial de datos |
+| `app/events` | Publicación/suscripción de eventos de dominio |
+| `app/adapters` | Servicio externo de almacenamiento |
 | `frontend/src` | Cliente React + Tailwind |
 
 ## Convenciones

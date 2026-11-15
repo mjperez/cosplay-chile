@@ -6,19 +6,20 @@ servicios: API FastAPI en `backend/` y cliente React + Tailwind en `frontend/`.
 
 **Estado:** plataforma completa y funcional. Los seis módulos y el panel de
 administración tienen pantalla, endpoints, reglas de negocio y datos de ejemplo.
-**138 pruebas de backend en verde**, lint del frontend con **0 errores y 0
-advertencias**, compilación de producción correcta y recorrido extremo a extremo
-verificado sobre el esquema real de migraciones (26/26 comprobaciones).
+**169 pruebas de backend en verde con 96% de cobertura**, lint del frontend con
+**0 errores y 0 advertencias**, compilación de producción correcta y pipeline de
+CI/CD activo en GitHub Actions + Render.
 
 | Módulo | Qué ofrece |
 |---|---|
 | Directorio | 20 fichas reales con filtros por región, tipo y búsqueda |
-| Contenidos | guías, entrevistas y artículos; editor de borradores y publicación |
+| Contenidos | guías, entrevistas y artículos; editor de borradores, **subida de imágenes** y publicación |
 | Eventos | calendario con filtros, detalle, inscripción con personaje y participantes |
 | Foro | temas por categoría, búsqueda, respuestas y cierre por autor o administrador |
 | Desafíos | desafío del mes vigente, historial y elección de ganador |
 | Comunidad | dónde comprar, grupos regionales y perfil público de cosplayer |
-| Administración | panel visual con métricas, bandeja editorial, eventos, foro, desafíos, cuentas y comunidad |
+| Avisos | notificaciones internas con contador de no leídas, generadas por el Observer |
+| Administración | panel visual con métricas, bandeja editorial, eventos, foro, desafíos, cuentas, comunidad y **bitácora de auditoría** |
 
 ---
 
@@ -117,7 +118,7 @@ configurar CORS ni `VITE_API_URL`.
 | Ruta | Qué es |
 |---|---|
 | `GET /health` | estado del servicio y de la base |
-| `GET /docs` | documentación interactiva (43 rutas) |
+| `GET /docs` | documentación interactiva (**49 rutas**) |
 | `POST /api/v1/auth/registro` | crear cuenta |
 | `POST /api/v1/auth/login` | obtener token |
 | `GET /api/v1/auth/me` | datos del usuario del token |
@@ -151,6 +152,11 @@ configurar CORS ni `VITE_API_URL`.
 | `GET /api/v1/perfiles/{id_usuario}` | perfil público |
 | `GET /api/v1/tiendas` | dónde comprar, con filtros y paginación |
 | `GET /api/v1/grupos` | grupos y comunidades, con filtros y paginación |
+| `POST /api/v1/archivos` | subir imagen (PNG/JPEG/WebP, máx. 5 MB) |
+| `DELETE /api/v1/archivos/{id}` | borrar imagen propia o como administrador |
+| `GET /api/v1/notificaciones/sin-leer` | contador para el encabezado |
+| `GET /api/v1/notificaciones` | bandeja de avisos del usuario |
+| `PATCH /api/v1/notificaciones/{id}/leer` | marcar aviso como leído |
 
 ### Panel de administración
 
@@ -178,6 +184,11 @@ protegido.
 | `POST /api/v1/admin/desafios/{id}/ganador` | elegir ganador |
 | `POST /api/v1/admin/tiendas` | dar de alta una tienda |
 | `POST /api/v1/admin/grupos` | dar de alta un grupo |
+| `GET /api/v1/admin/auditoria` | bitácora de eventos de dominio y correos de moderación |
+
+La pestaña **Auditoría** muestra fecha, categoría, evento, actor, recurso y
+detalle de cada acción emitida por el Observer. Es de solo lectura y el router
+completo exige rol `administrador`.
 
 Las transiciones editoriales están acotadas: `pendiente → publicado | rechazado`,
 `publicado → pendiente`, `rechazado → pendiente | publicado`. Un administrador
@@ -192,10 +203,12 @@ no puede desactivar su propia cuenta.
 | `npm run lint` | oxlint |
 | `npm run preview` | sirve `dist/` para probar la compilación |
 
-Páginas: `/`, `/directorio`, `/contenido`, `/contenido/nuevo`,
+**18 páginas**: `/`, `/directorio`, `/contenido`, `/contenido/nuevo`,
 `/contenido/:id`, `/eventos`, `/eventos/:id`, `/foro`, `/foro/:id`,
-`/desafios`, `/comunidad`, `/perfil`, `/ingresar`, `/registro`,
-`/privacidad` y 404. La navegación completa está en el encabezado y en el pie.
+`/desafios`, `/comunidad`, `/perfil`, `/notificaciones`, `/admin`,
+`/ingresar`, `/registro`, `/privacidad` y 404. La navegación completa está en el
+encabezado y en el pie. **Avisos** lleva un badge con el número de
+notificaciones sin leer, que se consulta al iniciar sesión.
 
 `VITE_API_URL` se normaliza en `src/lib/api.ts` y `src/lib/modulos.ts`: se le
 quitan las barras finales antes de concatenar, para que un valor como
@@ -204,18 +217,31 @@ quitan las barras finales antes de concatenar, para que un valor como
 ## Pruebas
 
 ```bash
-cd backend && pytest
+cd backend && pip install -r requirements-dev.txt && pytest
+cd backend && pytest --cov=app --cov-fail-under=90
+cd frontend && npm ci && npm run lint && npm run build
 ```
 
-138 pruebas sobre SQLite en un directorio temporal, con el esquema aplicado por
-la misma migración de producción. No tocan la base de desarrollo ni servicios
-externos. Cubren infraestructura, autenticación, autorización, directorio,
-contenido, los seis módulos nuevos, el panel de administración y las semillas
-(incluida su idempotencia).
+**169 pruebas** sobre SQLite en un directorio temporal, con el esquema aplicado
+por `alembic upgrade head`, la misma migración de producción. No tocan la base
+de desarrollo ni servicios externos. **Cobertura medida: 96%** (2550
+sentencias, 100 sin cubrir); el umbral del pipeline es 90%.
 
-El recorrido extremo a extremo adicional se documenta en
-[`GUIA_DEMO.md`](GUIA_DEMO.md): migración, semillas, arranque y peticiones
-reales de login, inscripción, foro y perfil.
+| Ámbito | Pruebas | Archivo |
+|---|---|---|
+| Infraestructura, auth, autorización, seguridad | base histórica | `test_*.py` |
+| Seis módulos y panel de administración | base histórica | `test_modulos_nuevos.py`, `test_panel_admin.py` |
+| **Observer**: 3 observadores, 4 eventos, bitácora, 401/403 | 13 | `test_observer.py` |
+| **Adapter**: interfaz, disco, Cloudinary, whitelist, HTTP, borrado | 18 | `test_adapter.py` |
+
+`test_adapter.py::test_los_cuatro_patrones_del_informe_estan_implementados`
+comprueba en una sola aserción por patrón que Singleton, Factory Method,
+Observer y Adapter están presentes y son los descritos en el informe ES2.
+
+Los defectos encontrados durante el desarrollo y sus correcciones están en
+[`CORRECCIONES_ES3.md`](CORRECCIONES_ES3.md), con el formato
+*hallazgo → corrección → evidencia* que pide el criterio 3.1.5. El recorrido
+extremo a extremo se documenta en [`GUIA_DEMO.md`](GUIA_DEMO.md).
 
 ## Despliegue en Render
 
@@ -243,6 +269,8 @@ Variables que se cargan a mano en el panel:
 | `CORS_ORIGINS` | API | URL pública del frontend, sin barra final |
 | `VITE_API_URL` | Web | URL pública del backend, sin barra final |
 | `DEMO_SEED` | API | `1` por defecto para la demo; poner `0` después |
+| `STORAGE_BACKEND` | API | `local` en la demo; `cloudinary` si se necesita persistencia |
+| `STORAGE_DIRECTORIO` | API | `/tmp/cosplay-archivos` (disco efímero del plan free) |
 
 `CORS_ORIGINS` y `VITE_API_URL` se necesitan entre sí: primero crea el backend
 para obtener su URL, luego el frontend, y por último vuelve al backend a
@@ -250,12 +278,134 @@ poner la URL del frontend en `CORS_ORIGINS`. Si `CORS_ORIGINS` queda con el
 valor por defecto (`http://localhost:5173`), el navegador bloquea las
 peticiones en producción.
 
+## Pipeline CI/CD y entornos
+
+```
+push / PR ──> GitHub Actions (.github/workflows/ci.yml)
+                ├─ Backend: Python 3.11 y 3.13 · pytest --cov-fail-under=90
+                ├─ Frontend: Node 22 · npm ci · lint · build
+                └─ Puerta de calidad (falla si algo anterior falló)
+                        │
+                        v  merge a main
+              Render autoDeploy (render.yaml)
+                alembic upgrade head → datos_base → [demo] → uvicorn
+                        │
+                        v
+              /health + smoke de login, avisos, auditoría e imágenes
+```
+
+`requirements.txt` es sólo de ejecución; `requirements-dev.txt` añade `pytest`,
+`httpx` y `pytest-cov`. `pytest.ini` fija `pythonpath = .` y `testpaths = tests`.
+`conftest.py` fija las variables de entorno **antes** de importar la aplicación,
+así que el CI no necesita secretos: `DATABASE_URL` apunta a un SQLite temporal,
+`JWT_SECRET` es de prueba y `BCRYPT_ROUNDS=4`.
+
+| Entorno | `ENVIRONMENT` | Base | Archivos | Uso |
+|---|---|---|---|---|
+| Desarrollo | `local` | SQLite o Supabase de pruebas | adaptador local | `npm run dev` + `uvicorn --reload` |
+| Testing | `test` | SQLite temporal por sesión | directorio temporal | pytest y GitHub Actions |
+| Producción | `production` | Supabase PostgreSQL 17 | `local` en demo / `cloudinary` con credenciales | Render, `main` |
+
+La semilla `demo` se niega a correr en `production` salvo `DEMO_SEED=1`, y las
+credenciales de Cloudinary se leen del entorno: el `api_secret` se usa para
+firmar la petición SHA-1 y **nunca** se envía en el cuerpo del multipart.
+
 ## Flujo de ramas
 
 | Rama | Uso | Despliegue |
 |---|---|---|
 | `main` | código desplegable | automático en Render (ambos servicios) |
 | `dev` | integración del sprint | manual |
+| `despliegue` | trabajo de la entrega | CI en verde antes de mergear a `main` |
+
+---
+
+## Los cuatro patrones comprometidos en el informe ES2
+
+La sección *"Patrones de diseño de la solución del problema"* del ES2 declaró
+cuatro patrones. Al cierre de ES3 **los cuatro están implementados y probados**:
+Singleton y Factory Method venían de la primera entrega; Observer y Adapter se
+incorporaron en ES3 porque el informe los daba por diseñados pero el código no
+los tenía. `test_los_cuatro_patrones_del_informe_estan_implementados` los
+verifica juntos para que no vuelvan a desincronizarse documento y código.
+
+| Patrón | Implementación | Papel | Prueba |
+|---|---|---|---|
+| **Singleton** (creacional) | `app/core/database.py` → `DatabaseSessionManager` | `__new__` con `threading.Lock`: un solo motor y un solo pool por proceso; `get_db()` inyecta la sesión | `test_singleton.py` |
+| **Factory Method** (creacional) | `app/factories/contenido_factory.py` → `CreadorContenido` + `CreadorGuia` / `CreadorEntrevista` / `CreadorArticulo` + `ContenidoFactory.para()/crear()` | Crea el subtipo correcto sin que el servicio conozca clases concretas | `test_contenido.py` |
+| **Observer** (comportamiento) | `app/events/gestor.py` + `app/events/observadores.py` | `GestorEventos` sujeto; `NotificacionInternaObserver`, `CorreoModeradorObserver`, `RegistroAuditoriaObserver` con `actualizar()`; catálogo cerrado de 4 eventos | `test_observer.py` (13) |
+| **Adapter** (estructural) | `app/adapters/almacenamiento.py` | `IAlmacenamientoArchivos` con `guardar_archivo/eliminar_archivo/obtener_enlace`; adaptadores Local y Cloudinary; inversión de dependencias vía `get_almacenamiento()` | `test_adapter.py` (18) |
+
+**Adaptación documentada del Observer.** El ES2 prometía avisos *"asíncronos en
+segundo plano"*. La implementación con `BackgroundTasks` produjo
+`database is locked` en SQLite porque la tarea abría una segunda conexión antes
+de que cerrara `get_db`. Se cambió a **misma sesión, misma transacción** para
+los tres observadores, y el único efecto diferido es el correo a moderación,
+que queda encolado en la bitácora con `estado="pendiente_de_envio"`. Se
+conserva la semántica (el usuario no espera por el correo) y se gana
+atomicidad: si el `commit` falla, no quedan avisos de un tutorial inexistente.
+El detalle completo está en [`CORRECCIONES_ES3.md`](CORRECCIONES_ES3.md).
+
+## Tres servicios al usuario: entrada → proceso → resultado
+
+Paso 3 de la Actividad 1. Cada servicio se presenta en la demo con su
+formulario, su efecto en la interfaz y su registro en la bitácora.
+
+### 1. Subir una imagen al editor de contenidos (RF-18 / RF-27)
+
+| | |
+|---|---|
+| **Entrada** | `multipart/form-data` con un archivo PNG, JPEG o WebP de hasta 5 MB y el token JWT del autor |
+| **Proceso** | `POST /api/v1/archivos` → autenticación → lista blanca de MIME + verificación de *magic bytes* (no confía en el `Content-Type`) + límite de tamaño → `nuevo_identificador()` genera `{uuid_dueño}/{uuid4}.ext` → `IAlmacenamientoArchivos.guardar_archivo()` → el endpoint compone la URL absoluta con `Request.base_url` |
+| **Resultado** | `ArchivoPublico {identificador, enlace, tipo_mime, tamano}`; el enlace se adjunta en `imagenes[]` al guardar el borrador y se muestra como miniatura. Errores: 401, 415, 400, 413 |
+| **Control** | OWASP A03 (validación de entrada), A01 (borrado autorizado por prefijo de dueño), defensa anti-`../` con `Path.is_relative_to()` |
+
+### 2. Enviar un tutorial a revisión (RF-12 / RF-37)
+
+| | |
+|---|---|
+| **Entrada** | Formulario del editor: `tipo`, `título`, `resumen`, `nivel`, `categoría`, `cuerpo`, `imágenes`, campos propios de guía/entrevista/artículo + token |
+| **Proceso** | Unión discriminada de Pydantic por `tipo` → `ContenidoFactory.crear()` → persistencia del borrador → `GestorEventos.notificar(contenido_enviado_revision, sesion=...)` → los tres observadores escriben en la misma transacción |
+| **Resultado** | Borrador en estado `pendiente`; aviso interno al autor y a los administradores; correo a `moderacion@cosplay.cl` encolado; fila en `bitacora_auditoria` con actor, recurso y detalle |
+| **Control** | ISO/IEC 27002 A.8.15 (trazabilidad), Ley 19.223, atomicidad de la transacción |
+
+### 3. Publicar un evento o desafío y avisar a la comunidad (RF-20 / RF-37)
+
+| | |
+|---|---|
+| **Entrada** | Formulario del panel admin: título, tipo, fecha (convertida a UTC naive), lugar, región + token de administrador |
+| **Proceso** | `Depends(requiere_admin)` → validación → persistencia → emisión de `evento_creado` / `desafio_creado` con `id_actor` → `NotificacionInternaObserver` avisa a **todos los usuarios activos menos el actor**, con deduplicación → `RegistroAuditoriaObserver` escribe el log |
+| **Resultado** | Evento visible en `/eventos` (o desafío en `/desafios`), N avisos internos con badge en el encabezado y una fila nueva en la pestaña **Auditoría** |
+| **Control** | ISO/IEC 27002 A.8.15 y A.8.3; minimización de datos de la Ley 21.719 |
+
+## Cloud computing, ética y normativa
+
+La solución se apoya en servicios administrados, sin servidores propios:
+
+| Capa | Proveedor | Uso |
+|---|---|---|
+| **SaaS** | Supabase | PostgreSQL 17 como servicio (sin administrar motor ni respaldos) |
+| **SaaS** | Cloudinary (opcional) | Almacenamiento y entrega de imágenes por CDN |
+| **SaaS** | GitHub Actions | Integración continua y cobertura |
+| **PaaS** | Render | API Python y sitio estático; migraciones y semillas en el `startCommand` |
+
+No se usa **IaaS**: no hay máquinas virtuales ni red que administrar. El
+*trade-off* es deliberado — menos control del sistema operativo a cambio de
+despliegue reproducible desde `main` y coste cero en la demo — y su límite
+conocido es el **disco efímero del plan free**, por eso el adaptador de
+almacenamiento es intercambiable.
+
+En lo ético se siguen los lineamientos de responsabilidad, no daño y respeto a
+la privacidad del **Código de Ética ACM / IEEE-CS**: no se publican datos de
+terceros sin consentimiento (el registro guarda fecha y versión del
+consentimiento), el cuerpo HTML se sanitiza antes de mostrarse, ningún secreto
+vive en el repositorio, la bitácora no guarda contraseñas ni tokens, y las
+cuentas demo se declaran **inseguras a propósito** con instrucciones explícitas
+para retirarlas después de la clase.
+
+Normativa aplicada: **ISO/IEC 27002** (A.8.15 registro de eventos, A.5.15 y
+A.8.3 control de acceso), **OWASP Top 10** A01/A02/A03, **Ley 19.223** de
+delitos informáticos y **Ley 21.719** de protección de datos personales.
 
 ---
 
@@ -307,6 +457,40 @@ credencial vive en el repositorio.
 estado de carga dentro de una microtarea, no de forma sincrónica en el
 `useEffect`, y usan una bandera `vigente` para descartar respuestas tardías.
 
+**FastAPI + React, y por qué.** FastAPI da validación declarativa con Pydantic
+(la unión discriminada por `tipo` elimina `if` manuales), OpenAPI generado y
+dependencias que permiten poner `requiere_admin` en un router completo. React +
+TypeScript + Vite dan tipado del contrato en el cliente y un bundle estático
+que Render sirve sin Node en producción. La alternativa era un monolito con
+plantillas del servidor: menos piezas, pero habría obligado a reimplementar el
+editor dinámico por tipo y el panel de administración con recargas completas.
+El coste asumido es mantener dos despliegues y configurar CORS.
+
+**Observer en la misma transacción.** Se descartó `BackgroundTasks` tras medir
+`database is locked`. Alternativas evaluadas: una cola externa (Celery/Redis),
+desproporcionada para la demo y con otro servicio que fallar; y un worker que
+lea una bandeja de salida, que es justo lo que se dejó para el correo. La
+solución elegida hace que avisos y auditoría sean **atómicos** con la operación
+de negocio, a costa de que el `POST` incluya unas pocas inserciones más.
+
+**Adapter local en demo, Cloudinary en producción.** El plan free de Render
+tiene disco efímero: las imágenes subidas desaparecen en cada reinicio. En la
+demo eso es aceptable y permite mostrar el flujo sin credenciales externas.
+Cambiar a `STORAGE_BACKEND=cloudinary` no toca ningún servicio ni endpoint:
+sólo la fábrica `obtener_almacenamiento()`. El `api_secret` se usa para firmar
+SHA-1 y jamás viaja en el body del multipart.
+
+**Migraciones aditivas.** `0005_observer_notificaciones_auditoria.py` sólo crea
+dos tablas e índices, sin alterar columnas existentes. La bitácora **no** tiene
+FK a `usuario` para que el historial sobreviva a la baja de una cuenta
+(A.8.15); las notificaciones sí la tienen con `ON DELETE CASCADE` por
+minimización de datos.
+
+**Cobertura como contrato, no como meta decorativa.** El umbral del CI es 90%
+frente al 96% real: deja margen para refactorizar sin que un cambio inocuo
+rompa el pipeline, pero bloquea cualquier entrega que deje código nuevo sin
+probar.
+
 ---
 
 ## Trazabilidad de criterios
@@ -345,6 +529,21 @@ estado de carga dentro de una microtarea, no de forma sincrónica en el
 La matriz completa de casos por requerimiento está en
 [`backend/tests/casos_por_rf.md`](backend/tests/casos_por_rf.md).
 
+### ES3 · Prototipo funcional
+
+| Criterio de la Unidad 3 | Dónde se evidencia |
+|---|---|
+| Repositorio Git y ramas con historial | `main`, `dev`, `despliegue`; respaldo `backup/pre-demo-admin` |
+| Pipeline de CI/CD | `.github/workflows/ci.yml` + `autoDeploy` en `render.yaml` |
+| Entornos desarrollo / testing / producción | `ENVIRONMENT=local\|test\|production`, tabla más arriba |
+| Entradas, procesos y resultados en ≥3 servicios | sección «Tres servicios al usuario» |
+| Cuatro patrones del informe ES2 | sección «Los cuatro patrones comprometidos» |
+| Logs de auditoría y normativa | `bitacora_auditoria`, `GET /admin/auditoria`, `CORRECCIONES_ES3.md` |
+| OWASP A01/A02/A03 | whitelist + magic bytes, secretos fuera del repo, control por dueño |
+| SOLID / Clean Code / testing desde el inicio / code review | capas, `IAlmacenamientoArchivos`, 169 pruebas, PR #1 |
+| Correcciones a partir de testing e ISO 27000 | `CORRECCIONES_ES3.md` (9 hallazgos) |
+| Justificación de arquitectura, tecnologías y trade-offs | sección «Decisiones de implementación» |
+
 ---
 
 ## Limitaciones conocidas
@@ -358,6 +557,12 @@ La matriz completa de casos por requerimiento está en
   propósito: una escalada de privilegios por descuido es peor que tener que
   usar SQL para promover una cuenta. Tampoco hay edición de contenidos ya
   creados; el flujo es borrador → publicar/rechazar → volver a borrador.
-- **Sin carga de imágenes.** Los contenidos usan texto y HTML saneado; el
-  portafolio del perfil es un enlace externo.
+- **Las imágenes de la demo no persisten entre reinicios.** El adaptador
+  `local` escribe en `/tmp`, que el plan free de Render limpia. Para
+  persistencia real basta configurar `STORAGE_BACKEND=cloudinary` y las tres
+  credenciales en el panel; el código no cambia. El portafolio del perfil
+  sigue siendo un enlace externo, no una galería propia.
+- **El correo a moderación se encola, no se envía.** Queda en la bitácora con
+  `estado="pendiente_de_envio"` a la espera de un worker de salida. La demo no
+  necesita SMTP y evita depender de un servicio externo más.
 - **Las cuentas demo son inseguras por diseño.** Solo para entornos de clase.

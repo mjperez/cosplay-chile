@@ -7,12 +7,19 @@ haber tocado tu PC. Esta guía asume que ya fusionaste el pull request.
 
 | Verificación | Resultado |
 |---|---|
-| Pruebas de backend (`pytest`) | **138 en verde** |
+| Pruebas de backend (`pytest`) | **169 en verde**, cobertura **96%** |
 | Lint del frontend (`npm run lint`) | **0 errores, 0 advertencias** |
 | Compilación (`npm run build`) | **correcta**, genera `dist/` |
-| Recorrido HTTP real con datos | **26/26 comprobaciones en verde** |
-| Módulos con pantalla y API | **6** + **panel de administración** (directorio, contenidos, eventos, foro, desafíos, comunidad, perfil y `/admin`) |
+| Pipeline de CI/CD | **verde** en `.github/workflows/ci.yml` + `autoDeploy` en Render |
+| Recorrido HTTP real con datos | **51/51 comprobaciones en verde** (`backend/scripts/recorrido_http.py`) |
+| Rutas en OpenAPI | **49** (antes 43) |
+| Módulos con pantalla y API | **7** + **panel de administración**: directorio, contenidos, eventos, foro, desafíos, comunidad, perfil, **avisos** y `/admin` con **Auditoría** |
+| Los cuatro patrones del ES2 | Singleton, Factory Method, **Observer** y **Adapter** implementados y probados |
 | Cuentas y contenido de ejemplo | listos con una sola orden |
+
+La evidencia de las correcciones hechas a partir de testing e ISO 27000 está en
+[`CORRECCIONES_ES3.md`](CORRECCIONES_ES3.md); el mapa de los tres servicios
+(entrada → proceso → resultado) y las decisiones técnicas, en `README.md`.
 
 ---
 
@@ -42,6 +49,8 @@ JWT_EXPIRE_MINUTES=60
 BCRYPT_ROUNDS=4
 ENVIRONMENT=local
 CORS_ORIGINS=http://localhost:5173
+STORAGE_BACKEND=local
+STORAGE_DIRECTORIO=./archivos-demo
 ENV
 
 alembic upgrade head
@@ -90,7 +99,13 @@ nueva, y el bundle del frontend ya incluye el panel de administración.
    | API | `JWT_SECRET` | la genera Render |
    | API | `CORS_ORIGINS` | URL pública del **frontend** |
    | API | `DEMO_SEED` | `1` (ya viene por defecto en `render.yaml`) |
+   | API | `STORAGE_BACKEND` | `local` (viene en `render.yaml`) |
+   | API | `STORAGE_DIRECTORIO` | `/tmp/cosplay-archivos` (disco efímero del plan free) |
    | Web | `VITE_API_URL` | URL pública del **backend** |
+
+   Las imágenes que subas en la demo se sirven desde `/archivos`. En Render el
+   disco es efímero, así que desaparecen al reiniciar el servicio: para la clase
+   no importa, y está documentado como *trade-off* en `README.md`.
 
    Orden importante: crea primero el backend para obtener su URL, ponla en
    `VITE_API_URL`, crea el frontend y copia su URL en `CORS_ORIGINS`. Sin
@@ -135,37 +150,58 @@ categorías** y **3 contenidos publicados**.
 
 ---
 
-## Guion de 8 minutos
+## Guion de 12 minutos
 
-1. **Inicio (30 s).** Mostrar las seis tarjetas de módulos, todas con enlace
-   activo. Enseñar que el encabezado ya no tiene etiquetas «pronto».
+1. **Inicio (30 s).** Mostrar las tarjetas de módulos, todas con enlace activo.
+   Enseñar que el encabezado ya no tiene etiquetas «pronto» y que ahora
+   aparece **Avisos** con un contador de no leídas.
 2. **Directorio (1 min).** `/directorio` → filtrar por región «Metropolitana»
    y por tipo, buscar por texto. Destacar que son 20 fichas reales del
    levantamiento y que no se publican datos de personas naturales.
-3. **Contenidos (1 min).** `/contenido` → abrir una guía, mostrar niveles,
-   materiales y pasos. Comentar el flujo borrador → publicación.
-4. **Eventos (2 min).** `/eventos` → filtrar por «convencion» → abrir el
+3. **Contenidos con imagen (2 min).** `/contenido` → abrir una guía, mostrar
+   niveles, materiales y pasos. Luego `/contenido/nuevo` con la cuenta
+   cosplayer: elegir «Guía», **adjuntar un PNG** (se ve la miniatura), guardar
+   como borrador. La pantalla de confirmación explica que el envío generó
+   avisos, correo a moderación y un registro de auditoría. Aquí se ven juntos
+   el **Adapter** (validación con magic bytes y URL pública), el **Factory
+   Method** (el formulario cambia por tipo) y el **Observer**.
+4. **Avisos (1 min).** Sin cambiar de cuenta, mirar el badge **Avisos** del
+   encabezado → `/notificaciones` → marcar uno como leído. Es el servicio 2
+   del mapa entrada → proceso → resultado.
+5. **Eventos (2 min).** `/eventos` → filtrar por «convencion» → abrir el
    detalle → ver los participantes → **ingresar como `cosplayer@cosplay.cl`** →
    inscribirse con un personaje → ver «mis eventos» y cancelar la inscripción.
    Aquí se ve autenticación, reglas de negocio y persistencia en una sola
    secuencia.
-5. **Foro (1.5 min).** `/foro` → filtrar por categoría → abrir un tema →
+6. **Foro (1.5 min).** `/foro` → filtrar por categoría → abrir un tema →
    responder → como autor, **cerrar el tema** y comprobar que el formulario
    desaparece. Es el mejor momento para hablar de permisos (403).
-6. **Desafíos y comunidad (1 min).** `/desafios` → destacado del mes + mes
+7. **Desafíos y comunidad (1 min).** `/desafios` → destacado del mes + mes
    anterior con ganador. `/comunidad` → tiendas que envían a Chile y grupos
    por región.
-7. **Perfil (1 min).** `/perfil` → editar especialidad, biografía y región
+8. **Perfil (1 min).** `/perfil` → editar especialidad, biografía y región
    (incluido «prefiero no indicarla») → guardar y volver a ver.
-8. **Panel de administración (2 min).** Cerrar sesión y entrar como
+9. **Panel de administración (2.5 min).** Cerrar sesión y entrar como
    `demo@cosplay.cl`: aparece **Administración** en el encabezado. Abrir
-   `/admin` → **Resumen** (12 contadores) → **Contenido** (crear un borrador
-   con la cuenta cosplayer y publicarlo aquí) → **Eventos** (crear uno y
-   verlo en `/eventos`) → **Foro** (ocultar un tema y comprobar que sale del
-   foro público, luego reabrirlo) → **Usuarios** (la cuenta admin no se puede
-   desactivar a sí misma). Cada acción recarga el panel con un aviso verde.
-9. **Cierre (30 s).** Abrir `/docs` y mostrar las 43 rutas; mencionar 138
-   pruebas, lint limpio y los dos servicios de Render.
+   `/admin` → **Resumen** (12 contadores) → **Contenido** (publicar el borrador
+   con imagen que creó el cosplayer) → **Eventos** (crear uno: eso dispara
+   avisos a toda la comunidad menos al actor) → **Foro** (ocultar un tema y
+   reabrirlo) → **Usuarios** (la cuenta admin no se puede desactivar a sí
+   misma) → **Auditoría** (mostrar las filas recién generadas: fecha,
+   categoría, evento, actor, recurso y detalle; explicar que el log sobrevive
+   a la baja de la cuenta por ISO 27002 A.8.15 y Ley 19.223).
+10. **Cierre (30 s).** Volver a entrar como cosplayer y ver que el badge
+    **Avisos** subió con el evento nuevo. Abrir `/docs` y mostrar las **49
+    rutas**; mencionar **169 pruebas**, **96% de cobertura**, el pipeline de
+    CI/CD y los dos servicios de Render.
+
+### Los tres servicios que pide el paso 3
+
+| Servicio | Entrada | Proceso | Resultado observable |
+|---|---|---|---|
+| Subir imagen | PNG + token | whitelist + magic bytes + `IAlmacenamientoArchivos` | miniatura y URL absoluta en `imagenes` |
+| Enviar tutorial | formulario por tipo | Factory + 3 observadores en la misma transacción | borrador, aviso al autor, correo encolado, fila en bitácora |
+| Crear evento | formulario admin | `evento_creado` → avisos masivos + log | evento en `/eventos`, badge con N avisos, fila en **Auditoría** |
 
 ### Si quieres mostrar la API por debajo del panel
 
@@ -181,6 +217,11 @@ con una interfaz encima.
 | Elegir ganador | `POST /api/v1/admin/desafios/{id}/ganador` |
 | Publicar un borrador | `POST /api/v1/admin/contenido/{id}/publicar` |
 | Ocultar un tema | `PATCH /api/v1/admin/foro/temas/{id}` |
+| **Ver la bitácora** | `GET /api/v1/admin/auditoria?limite=100` |
+| **Contador de avisos** | `GET /api/v1/notificaciones/sin-leer` |
+| **Bandeja de avisos** | `GET /api/v1/notificaciones` |
+| **Marcar como leído** | `PATCH /api/v1/notificaciones/{id}/leer` |
+| **Subir una imagen** | `POST /api/v1/archivos` (multipart, campo `archivo`) |
 
 Ejemplo rápido de crear un evento desde la terminal:
 
@@ -206,6 +247,13 @@ curl -X POST http://localhost:8000/api/v1/admin/eventos \
       no un nombre de persona: así se ve de inmediato con qué rol entraste.
 - [ ] `/eventos` muestra 6 eventos y `/foro` muestra 5 temas.
 - [ ] Entrando como `demo@cosplay.cl` se ve **Administración** y `/admin` carga el resumen.
+- [ ] El encabezado muestra **Avisos** y `/notificaciones` abre la bandeja.
+- [ ] En `/contenido/nuevo` se puede adjuntar un PNG y aparece la miniatura.
+- [ ] En `/admin` existe la pestaña **Auditoría** y muestra registros con fecha, actor y detalle.
+- [ ] `GET /api/v1/notificaciones/sin-leer` con token responde 200 y el badge coincide.
+- [ ] `GET /api/v1/admin/auditoria` con token de cosplayer responde **403** (rol).
+- [ ] `POST /api/v1/archivos` con un SVG renombrado a `.png` responde **415** (magic bytes).
+- [ ] `GET /docs` muestra **49 rutas**, incluidas `/archivos` y `/admin/auditoria`.
 - [ ] En Render, el login `demo@cosplay.cl` / `Demo2026!` responde 200 (si da 401, redesplegar la API).
 - [ ] Si usas Render, abriste la URL 5 minutos antes para evitar el arranque en frío.
 - [ ] Llevas esta guía abierta en el móvil por si falla la red de la sala (la opción A no depende de internet una vez instaladas las dependencias).
@@ -240,14 +288,18 @@ Tres formas, de menos a más drástica:
 | **`git revert`** | Quieres conservar el historial y que Render redespliegue solo | Ver la secuencia de abajo |
 
 > **Ojo con el `git revert`.** El merge del PR es `94f8b2c`, pero después se
-> subieron cuatro commits directos a `main` (`95fed8a`, `078a7ed`, `1e17741` y
-> `3c76c06`: despliegue, nombres de cuentas y documentación). Hacer solo
-> `git revert -m 1 94f8b2c0` quita la plataforma pero **deja esos cuatro**.
-> La secuencia completa, en orden inverso, se probó y deja el árbol idéntico
-> al respaldo `bcef3c4`:
+> subieron varios commits directos a `main` (despliegue, nombres de cuentas,
+> corrección del rollback y, por último, el cierre de ES3 con Observer,
+> Adapter y CI/CD). Hacer solo `git revert -m 1 94f8b2c0` quita la plataforma
+> pero **deja todos esos commits**. La secuencia completa, en orden inverso y
+> verificada en una rama desechable, deja el árbol idéntico al respaldo
+> `bcef3c4`:
 >
 > ```bash
 > git checkout main && git pull --ff-only
+> ULTIMO=$(git rev-parse --short HEAD)     # el commit de cierre de ES3
+> git revert --no-edit "$ULTIMO"
+> git revert --no-edit 3454d91
 > git revert --no-edit 3c76c06
 > git revert --no-edit 1e17741
 > git revert --no-edit 078a7ed
@@ -255,6 +307,11 @@ Tres formas, de menos a más drástica:
 > git revert -m 1 --no-edit 94f8b2c0
 > git push origin main
 > ```
+>
+> Si en el futuro se agregan más commits a `main`, basta con revertirlos
+> primero: `git log --oneline bcef3c4..HEAD` los lista de más reciente a más
+> antiguo, y se revierten en ese mismo orden. Sólo el merge `94f8b2c0`
+> necesita `-m 1`.
 >
 > Importante: ejecútala con el árbol limpio (`git status` sin cambios). Si hay
 > archivos sin commitear, el primer revert se aborta y los siguientes producen
@@ -267,10 +324,24 @@ Tres formas, de menos a más drástica:
 > `backup-pre-demo-admin` **ya están publicadas en GitHub**, así que el respaldo
 > sobrevive aunque borres el clon local o trabajes solo desde el móvil.
 
-Recuerda que las **migraciones no se revierten** con `git revert`: este cambio
-no agregó ninguna migración, así que la base sigue siendo compatible con ambas
-versiones. Si en el futuro revertís un cambio que sí tocó Alembic, revisa ese
-punto antes.
+> **⚠️ Ahora SÍ hay una migración nueva.** ES3 agregó
+> `0005_observer_notificaciones_auditoria.py`, que crea `notificacion` y
+> `bitacora_auditoria`. Es puramente **aditiva**: el código anterior a ES3
+> simplemente ignora esas dos tablas y puede seguir leyendo la base. Lo que
+> **no** es compatible es `alembic_version`, que queda en `0005` mientras el
+> código revertido sólo conoce hasta `0004`; el `startCommand` de Render
+> ejecuta `alembic upgrade head` y fallaría al no encontrar la revisión.
+> Antes de redesplegar código anterior, baja el esquema:
+>
+> ```bash
+> cd backend
+> alembic downgrade 0004
+> ```
+>
+> En la base de Render esto se hace con una sesión de shell del servicio o con
+> una consulta sobre `alembic_version` si no hay shell disponible. Si decides
+> **no** hacer el downgrade porque las tablas nuevas no estorban, deja al menos
+> el archivo `0005` en el árbol para que Alembic siga resolviendo `head`.
 
 ---
 

@@ -1,0 +1,115 @@
+name: CI
+
+# Puerta de calidad del pipeline CI/CD. Cada push y cada PR ejecuta las
+# pruebas de backend con cobertura mínima y la compilación completa del
+# frontend. La "CD" la completa Render con `autoDeploy: true` sobre `main`
+# (ver render.yaml): si este workflow falla, no se mergea a `main` y el
+# servicio de producción no cambia.
+on:
+  push:
+    branches: [main, dev, despliegue]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend · Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.13 es la versión de Render; 3.11 es la del entorno de desarrollo
+        # local. Probar ambas evita "funciona en mi máquina".
+        python: ["3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # conftest.py fija DATABASE_URL (SQLite), JWT_SECRET, ENVIRONMENT=test,
+      # BCRYPT_ROUNDS=4 y STORAGE_DIRECTORIO antes de importar la aplicación.
+      # El esquema se crea con `alembic upgrade head`, el mismo de producción.
+      - name: Pruebas y cobertura
+        run: >-
+          pytest
+          --cov=app
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=90
+
+      - name: Guardar informe de cobertura
+        if: matrix.python == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: backend/coverage.xml
+          if-no-files-found: error
+
+  frontend:
+    name: Frontend · lint y build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias (reproducible)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compilación de producción
+        run: npm run build
+
+      - name: Guardar bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-frontend
+          path: frontend/dist/
+          if-no-files-found: error
+
+  puerta_de_calidad:
+    name: Puerta de calidad previa al despliegue
+    needs: [backend, frontend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar resultados
+        run: |
+          if [ "${{ needs.backend.result }}" != "success" ] || [ "${{ needs.frontend.result }}" != "success" ]; then
+            echo "::error::La puerta de calidad no pasó. No se debe desplegar."
+            exit 1
+          fi
+          echo "Backend y frontend en verde. Render desplegará main automáticamente." >> "$GITHUB_STEP_SUMMARY"

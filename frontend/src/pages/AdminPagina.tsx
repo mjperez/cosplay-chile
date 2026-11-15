@@ -41,6 +41,7 @@ type Seccion =
   | 'desafios'
   | 'usuarios'
   | 'comunidad'
+  | 'auditoria'
 
 const SECCIONES: { clave: Seccion; nombre: string }[] = [
   { clave: 'resumen', nombre: 'Resumen' },
@@ -50,7 +51,29 @@ const SECCIONES: { clave: Seccion; nombre: string }[] = [
   { clave: 'desafios', nombre: 'Desafíos' },
   { clave: 'usuarios', nombre: 'Usuarios' },
   { clave: 'comunidad', nombre: 'Comunidad' },
+  { clave: 'auditoria', nombre: 'Auditoría' },
 ]
+
+const ETIQUETAS_EVENTO_AUDITORIA: Record<string, string> = {
+  contenido_enviado_revision: 'Contenido enviado a revisión',
+  contenido_publicado: 'Contenido publicado',
+  evento_creado: 'Evento creado',
+  desafio_creado: 'Desafío creado',
+}
+
+const ETIQUETAS_CATEGORIA_AUDITORIA: Record<string, string> = {
+  evento_dominio: 'Evento de dominio',
+  correo_moderacion: 'Correo a moderación',
+}
+
+/** El detalle es JSON libre; se muestra compacto y sin romper la tabla. */
+function detalleCorto(detalle: Record<string, unknown> | null): string {
+  if (!detalle || Object.keys(detalle).length === 0) return '—'
+  const texto = Object.entries(detalle)
+    .map(([clave, valor]) => `${clave}: ${String(valor)}`)
+    .join(' · ')
+  return texto.length > 90 ? `${texto.slice(0, 87)}…` : texto
+}
 
 const METRICAS: { clave: keyof ResumenAdmin; nombre: string }[] = [
   { clave: 'usuarios', nombre: 'Cuentas' },
@@ -1047,6 +1070,61 @@ export function AdminPagina() {
                       ))}
                     </ul>
                   </div>
+                </div>
+              </section>
+            )}
+
+            {/* ----------------------------- Auditoría ---------------------------- */}
+            {seccion === 'auditoria' && (
+              <section aria-labelledby="titulo-auditoria">
+                <h2 id="titulo-auditoria" className="text-xl font-bold text-tinta-900">
+                  Bitácora de auditoría
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-tinta-600">
+                  Registro de las acciones relevantes emitidas por el patrón
+                  Observer: actor, recurso, fecha y detalle. Responde al control
+                  A.8.15 de ISO/IEC 27002 y a la Ley 19.223. Los registros no
+                  dependen de que la cuenta del actor siga existiendo.
+                </p>
+                <p className="mt-3 text-sm font-medium text-tinta-700" role="status">
+                  {datos.auditoria.total} registro(s). Se muestran los 100 más recientes.
+                </p>
+
+                <div>
+                  <Tabla encabezados={['Fecha', 'Categoría', 'Evento', 'Actor', 'Recurso', 'Detalle']}>
+                    {datos.auditoria.elementos.map((registro) => (
+                      <tr key={registro.id_registro} className="border-t border-tinta-200 text-sm">
+                        <td className="whitespace-nowrap px-3 py-2 text-tinta-600">
+                          {formatearFechaHora(registro.ocurrido_en)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Etiqueta tono="neutro">
+                            {ETIQUETAS_CATEGORIA_AUDITORIA[registro.categoria] ?? registro.categoria}
+                          </Etiqueta>
+                        </td>
+                        <td className="px-3 py-2 font-medium text-tinta-900">
+                          {ETIQUETAS_EVENTO_AUDITORIA[registro.tipo_evento] ?? registro.tipo_evento}
+                        </td>
+                        <td className="px-3 py-2 text-tinta-600">
+                          {registro.correo_actor ?? 'sistema'}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-tinta-500">
+                          {registro.id_recurso ? `${registro.id_recurso.slice(0, 8)}…` : '—'}
+                        </td>
+                        <td className="max-w-xs px-3 py-2 text-xs text-tinta-600">
+                          {detalleCorto(registro.detalle)}
+                        </td>
+                      </tr>
+                    ))}
+                    {datos.auditoria.elementos.length === 0 && (
+                      <tr className="border-t border-tinta-200 text-sm">
+                        <td colSpan={6} className="px-3 py-6 text-center text-tinta-500">
+                          Todavía no hay registros. Envía un tutorial a revisión o
+                          crea un evento para generar el primero.
+                        </td>
+                      </tr>
+                    )}
+                  </Tabla>
                 </div>
               </section>
             )}

@@ -52,6 +52,25 @@ export interface PaginaUsuariosAdmin {
   elementos: Usuario[]
 }
 
+/** Bitácora inmutable: sobrevive a la baja de la cuenta del actor. */
+export interface RegistroAuditoria {
+  id_registro: string
+  ocurrido_en: string
+  categoria: string
+  tipo_evento: string
+  correo_actor: string | null
+  id_recurso: string | null
+  detalle: Record<string, unknown> | null
+  ip_origen: string | null
+}
+
+export interface PaginaAuditoria {
+  total: number
+  limite: number
+  desplazamiento: number
+  elementos: RegistroAuditoria[]
+}
+
 export type EstadoTema = Tema['estado']
 export type EstadoContenido = Contenido['estado']
 
@@ -173,6 +192,10 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(datos),
     }),
+
+  // --- Bitácora de auditoría -------------------------------------------
+  auditoria: () =>
+    peticionModulo<PaginaAuditoria>(`${RAIZ}/auditoria?limite=100`),
 }
 
 /** Carga conjunta del panel. Se pide todo de una vez para una demo ágil. */
@@ -186,6 +209,7 @@ export interface DatosPanel {
   tiendas: PaginaTiendas
   grupos: PaginaGrupos
   categorias: Categoria[]
+  auditoria: PaginaAuditoria
 }
 
 export async function cargarPanel(): Promise<DatosPanel> {
@@ -199,6 +223,7 @@ export async function cargarPanel(): Promise<DatosPanel> {
     tiendas,
     grupos,
     categorias,
+    auditoria,
   ] = await Promise.all([
     adminApi.resumen(),
     adminApi.usuarios(),
@@ -209,6 +234,18 @@ export async function cargarPanel(): Promise<DatosPanel> {
     peticionModulo<PaginaTiendas>('/api/v1/tiendas'),
     peticionModulo<PaginaGrupos>('/api/v1/grupos'),
     adminApi.categorias(),
+    adminApi.auditoria(),
   ])
-  return { resumen, usuarios, contenido, eventos, temas, desafios, tiendas, grupos, categorias }
+  return {
+    resumen,
+    usuarios,
+    contenido,
+    eventos,
+    temas,
+    desafios,
+    tiendas,
+    grupos,
+    categorias,
+    auditoria,
+  }
 }

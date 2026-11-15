@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.events.gestor import EventoDominio, emitir
 from app.models.evento import EventoCosplay, ParticipacionEvento
 from app.models.usuario import Usuario
 from app.repositories import evento as repo
@@ -63,8 +64,12 @@ def obtener(sesion: Session, id_evento: uuid.UUID) -> EventoCosplay:
     return evento
 
 
-def crear(sesion: Session, datos: EventoEntrada) -> EventoCosplay:
-    return repo.crear(
+def crear(
+    sesion: Session,
+    datos: EventoEntrada,
+    id_actor: uuid.UUID | None = None,
+) -> EventoCosplay:
+    evento = repo.crear(
         sesion,
         nombre=datos.nombre.strip(),
         tipo=datos.tipo,
@@ -74,6 +79,16 @@ def crear(sesion: Session, datos: EventoEntrada) -> EventoCosplay:
         region=datos.region,
         enlace_oficial=datos.enlace_oficial,
     )
+    emitir(
+        EventoDominio(
+            tipo="evento_creado",
+            id_actor=id_actor,
+            id_recurso=evento.id_evento,
+            detalle={"titulo": evento.nombre},
+        ),
+        sesion=sesion,
+    )
+    return evento
 
 
 def inscribirse(

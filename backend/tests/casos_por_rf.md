@@ -1,8 +1,10 @@
 # Matriz de casos por requerimiento (EV4)
 
 Trazabilidad entre los requerimientos funcionales, el código que los implementa
-y las pruebas automatizadas que los verifican. Las 138 pruebas se ejecutan con
-`pytest` desde `backend/` y no requieren servicios externos.
+y las pruebas automatizadas que los verifican. Las **169 pruebas** se ejecutan
+con `pytest` desde `backend/` y no requieren servicios externos; la cobertura
+medida es **96%**. Los 31 casos añadidos en ES3 corresponden a los patrones
+Observer (13) y Adapter (18) comprometidos en el informe ES2.
 
 Convención: `ID de caso` identifica la fila; `Archivo` es la prueba que la
 cubre; `Resultado` es el estado observado en la última ejecución completa.
@@ -108,15 +110,63 @@ cubre; `Resultado` es el estado observado en la última ejecución completa.
 | C-48 | Alta de tienda y grupo valida duplicados y URLs | `app/schemas/admin.py` | `test_alta_de_tienda_y_grupo_valida_duplicados_y_urls` | ✅ |
 | C-49 | Crear categoría desde el panel | `app/api/routes/admin.py` | `test_crear_categoria_desde_el_panel` | ✅ |
 
+## RF-11 · Observer: notificaciones internas (RF-37)
+
+| Caso | Requerimiento | Implementación | Prueba | Resultado |
+|---|---|---|---|---|
+| C-52 | El gestor registra exactamente los 3 observadores del ES2 | `app/events/gestor.py` | `test_el_gestor_registra_los_tres_observadores_del_informe` | ✅ |
+| C-53 | `configurar_observadores()` es idempotente | `app/main.py`, `app/events/observadores.py` | `test_configurar_observadores_es_idempotente` | ✅ |
+| C-54 | Enviar tutorial dispara aviso, correo y bitácora | `app/services/contenido.py` | `test_enviar_un_tutorial_dispara_los_tres_observadores` | ✅ |
+| C-55 | La bitácora guarda actor, recurso y detalle | `app/events/observadores.py` | `test_la_bitacora_registra_actor_recurso_y_detalle` | ✅ |
+| C-56 | Publicar contenido avisa al autor | `app/services/contenido.py` | `test_publicar_un_contenido_avisa_al_autor` | ✅ |
+| C-57 | Crear evento avisa a la comunidad pero no al actor | `app/services/evento.py` | `test_crear_evento_avisa_a_la_comunidad_pero_no_al_actor` | ✅ |
+| C-58 | Crear desafío dispara aviso y bitácora | `app/services/comunidad.py` | `test_crear_desafio_dispara_notificacion_y_bitacora` | ✅ |
+| C-59 | Un UUID ajeno da 404, no 403 | `app/repositories/notificacion.py` | `test_marcar_como_leida_no_permite_avisos_ajenos` | ✅ |
+| C-60 | Los endpoints de avisos exigen sesión | `app/api/routes/notificaciones.py` | `test_los_endpoints_de_notificaciones_exigen_sesion` | ✅ |
+| C-61 | Un observador caído no impide a los demás | `app/events/gestor.py` | `test_un_observador_caido_no_impide_a_los_demas` | ✅ |
+| C-62 | Un tipo fuera del catálogo se rechaza | `app/events/gestor.py` | `test_un_tipo_de_evento_fuera_del_catalogo_se_rechaza` | ✅ |
+
+## RF-12 · Adapter: imágenes de contenidos (RF-18 / RF-27 / RF-08)
+
+| Caso | Requerimiento | Implementación | Prueba | Resultado |
+|---|---|---|---|---|
+| C-63 | La interfaz tiene los 3 métodos comprometidos en el ES2 | `app/adapters/almacenamiento.py` | `test_la_interfaz_tiene_los_tres_metodos_comprometidos_en_el_es2` | ✅ |
+| C-64 | El adaptador local guarda, devuelve enlace y borra | `AlmacenamientoLocalAdapter` | `test_el_adaptador_local_guarda_devuelve_enlace_y_borra` | ✅ |
+| C-65 | Rechaza `../` fuera del directorio (OWASP A01/A03) | `AlmacenamientoLocalAdapter._ruta()` | `test_el_adaptador_rechaza_salir_del_directorio` | ✅ |
+| C-66 | Cloudinary traduce las 3 operaciones al cliente externo | `CloudinaryStorageAdapter` | `test_cloudinary_traduce_las_tres_operaciones_al_cliente_externo` | ✅ |
+| C-67 | La firma HTTP no envía el `api_secret` en el body | `ClienteCloudinaryHTTP` | `test_el_cliente_http_firma_la_peticion_y_envia_el_binario` | ✅ |
+| C-68 | La fábrica elige backend y exige credenciales | `obtener_almacenamiento()` | `test_la_fabrica_elige_el_backend_y_exige_credenciales` | ✅ |
+| C-69 | Las credenciales viven en `Settings`, no en el código | `app/core/config.py` | `test_las_credenciales_viven_en_la_configuracion_no_en_el_codigo` | ✅ |
+| C-70 | Lista blanca PNG/JPEG/WebP | `app/services/archivos.py` | `test_el_servicio_acepta_solo_los_tres_formatos_de_la_lista_blanca` | ✅ |
+| C-71 | Rechaza SVG y tipos fuera de lista | `app/services/archivos.py` | `test_el_servicio_rechaza_un_tipo_fuera_de_la_lista` | ✅ |
+| C-72 | No confía en el `Content-Type`: verifica magic bytes | `app/services/archivos.py::_coincide` | `test_el_servicio_no_confia_en_el_content_type_declarado` | ✅ |
+| C-73 | Rechaza vacíos y archivos de más de 5 MB | `app/services/archivos.py` | `test_el_servicio_rechaza_vacios_y_demasiado_grandes` | ✅ |
+| C-74 | Subida por HTTP y posterior GET del enlace absoluto | `app/api/routes/archivos.py` | `test_subir_una_imagen_por_http_y_servirla` | ✅ |
+| C-75 | La API traduce errores a 415/400/413 y exige token | `app/api/routes/archivos.py` | `test_la_api_rechaza_entradas_peligrosas`, `test_sin_token_no_se_puede_subir` | ✅ |
+| C-76 | Borrado ajeno da 403; el propio da 204 | `app/api/routes/archivos.py` | `test_no_se_puede_borrar_un_archivo_de_otra_cuenta` | ✅ |
+| C-77 | Los cuatro patrones del ES2 están implementados | todos | `test_los_cuatro_patrones_del_informe_estan_implementados` | ✅ |
+
+## RF-13 · Auditoría, normativa y CI/CD (ES3)
+
+| Caso | Requerimiento | Implementación | Prueba | Resultado |
+|---|---|---|---|---|
+| C-78 | La bitácora es de solo lectura para administradores | `app/api/routes/admin.py` | `test_la_bitacora_solo_la_lee_un_administrador` | ✅ |
+| C-79 | La bitácora sobrevive a la baja del actor (sin FK) | `0005_observer_notificaciones_auditoria.py` | `test_la_bitacora_no_tiene_clave_foranea_hacia_usuario` | ✅ |
+| C-80 | Pipeline con cobertura ≥90%, lint y build | `.github/workflows/ci.yml` | ejecución local `pytest --cov-fail-under=90` | ✅ |
+| C-81 | Los defectos encontrados quedan documentados | `CORRECCIONES_ES3.md` | 9 hallazgos con corrección y evidencia | ✅ |
+
 ## Verificación no automatizada (recorrido de demo)
 
-Además de las pruebas, se ejecutó un recorrido extremo a extremo real sobre
-SQLite con el esquema de Alembic: migración, semillas, arranque de uvicorn y
-26 comprobaciones HTTP (health, login de administrador y de cosplayer, 401/403
-del panel, resumen, bandeja editorial con publicar/rechazar/borrador, alta y
-baja de eventos, moderación del foro, desafíos, tiendas, grupos, rechazo de
-URLs `javascript:` y OpenAPI con 43 rutas). **26/26 en verde.** El guion
-reproducible está en [`GUIA_DEMO.md`](../../GUIA_DEMO.md).
+Además de las pruebas, `backend/scripts/recorrido_http.py` prepara una base
+SQLite temporal, aplica `alembic upgrade head`, carga ambas semillas, levanta
+`uvicorn` y ejecuta peticiones HTTP **reales** con `httpx` (sin `TestClient`):
+health, OpenAPI con **49 rutas**, login de las tres cuentas demo, 401/403 del
+panel y de la auditoría, los siete catálogos, subida de PNG con verificación de
+magic bytes y rechazo de SVG/vacío, borrado ajeno 403 y propio 204, borrador con
+imagen, avisos internos, correo a moderación encolado, bitácora, creación de
+evento con avisos masivos, marcar leída, publicación editorial y alta de tema
+en el foro. **51/51 comprobaciones en verde** (salida 0). El guion de exposición
+está en [`GUIA_DEMO.md`](../../GUIA_DEMO.md).
 
 ## Resumen
 
@@ -128,4 +178,11 @@ reproducible está en [`GUIA_DEMO.md`](../../GUIA_DEMO.md).
 | Módulos nuevos | 18 |
 | Semillas de demostración | 9 |
 | Panel de administración | 15 |
-| **Total** | **138** |
+| **Observer (ES3)** | **13** |
+| **Adapter (ES3)** | **18** |
+| **Total** | **169** |
+
+La cobertura medida es **96%** (2550 sentencias, 100 sin cubrir) y el umbral
+exigido por el pipeline es 90%. Los defectos detectados durante el desarrollo
+y sus correcciones están en
+[`CORRECCIONES_ES3.md`](../../CORRECCIONES_ES3.md).

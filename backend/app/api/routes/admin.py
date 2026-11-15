@@ -21,6 +21,7 @@ from app.models.usuario import Usuario
 from app.repositories import admin as repo_admin
 from app.repositories import contenido as repo_contenido
 from app.repositories import evento as repo_evento
+from app.repositories import notificacion as repo_notificacion
 from app.repositories import usuario as repo_usuarios
 from app.schemas.admin import (
     EstadoTemaEntrada,
@@ -46,6 +47,7 @@ from app.schemas.contenido import (
 )
 from app.schemas.directorio import GrupoPublico, TiendaPublica
 from app.schemas.evento import EventoEntrada, EventoPublico, PaginaEventos
+from app.schemas.notificacion import PaginaAuditoria, RegistroAuditoriaPublico
 from app.services import admin as servicio_admin
 from app.services import comunidad as servicio_comunidad
 from app.services import contenido as servicio_contenido
@@ -282,9 +284,12 @@ def listar_eventos(
     summary="Crear un evento",
 )
 def crear_evento(
-    datos: EventoEntrada, sesion: Session = Depends(get_db)
+    datos: EventoEntrada,
+    usuario: Usuario = Depends(get_usuario_actual),
+    sesion: Session = Depends(get_db),
 ) -> EventoPublico:
-    return _evento_publico(sesion, servicio_evento.crear(sesion, datos))
+    evento = servicio_evento.crear(sesion, datos, id_actor=usuario.id_usuario)
+    return _evento_publico(sesion, evento)
 
 
 @router.delete(
@@ -300,6 +305,36 @@ def eliminar_evento(
     except servicio_admin.EventoNoEncontrado:
         raise HTTPException(404, "evento no encontrado")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Bitácora de auditoría ------------------------------------------------
+
+
+@router.get(
+    "/auditoria",
+    response_model=PaginaAuditoria,
+    summary="Bitácora de auditoría de eventos de dominio y moderación",
+)
+def listar_auditoria(
+    limite: int = Query(50, ge=1, le=200),
+    desplazamiento: int = Query(0, ge=0),
+    sesion: Session = Depends(get_db),
+) -> PaginaAuditoria:
+    """Log de auditoría exigido por la Ley 19.223 y el control A.8.15 de ISO 27002.
+
+    Cada acción relevante emitida por el Observer queda registrada con actor,
+    recurso, fecha y detalle. El router completo exige `administrador`, así que
+    la bitácora no es consultable por usuarios normales.
+    """
+    total, filas = repo_notificacion.listar_auditoria(
+        sesion, limite=limite, desplazamiento=desplazamiento
+    )
+    return PaginaAuditoria(
+        total=total,
+        limite=limite,
+        desplazamiento=desplazamiento,
+        elementos=[RegistroAuditoriaPublico.model_validate(fila) for fila in filas],
+    )
 
 
 # --- Moderación del foro --------------------------------------------------
@@ -364,10 +399,14 @@ def listar_desafios(sesion: Session = Depends(get_db)) -> PaginaDesafios:
     summary="Crear un desafío mensual",
 )
 def crear_desafio(
-    datos: DesafioEntrada, sesion: Session = Depends(get_db)
+    datos: DesafioEntrada,
+    usuario: Usuario = Depends(get_usuario_actual),
+    sesion: Session = Depends(get_db),
 ) -> DesafioPublico:
     try:
-        fila = servicio_comunidad.crear_desafio(sesion, datos)
+        fila = servicio_comunidad.crear_desafio(
+            sesion, datos, id_actor=usuario.id_usuario
+        )
     except servicio_comunidad.MesDuplicado as error:
         raise HTTPException(409, f"ya existe un desafío para {error.mes}")
     return _desafio_publico(*fila)

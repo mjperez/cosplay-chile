@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     db_pool_recycle: int = 1800
     db_echo: bool = False
 
+    # --- Almacenamiento de archivos (patrón Adapter) --------------------
+    # "local" para desarrollo/demo; "cloudinary" en producción. Las
+    # credenciales del proveedor nunca van en el código: se leen del entorno.
+    storage_backend: str = "local"
+    storage_directorio: str = "/tmp/cosplay-archivos"
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
+
     # --- Seguridad ------------------------------------------------------
     jwt_secret: str = Field(..., min_length=16)
     jwt_algorithm: str = "HS256"

@@ -12,11 +12,13 @@ from app.models.contenido import (
 from app.models.directorio import ComunidadGrupo, DondeComprar, Proveedor
 from app.models.evento import EventoCosplay, ParticipacionEvento
 from app.models.intento_login import IntentoLogin
+from app.models.notificacion import BitacoraAuditoria, Notificacion
 from app.models.usuario import PerfilCosplayer, Usuario
 
 __all__ = [
     "Articulo",
     "Base",
+    "BitacoraAuditoria",
     "CategoriaContenido",
     "ComunidadGrupo",
     "Contenido",
@@ -28,6 +30,7 @@ __all__ = [
     "ForoTema",
     "GuiaTutorial",
     "IntentoLogin",
+    "Notificacion",
     "ParticipacionEvento",
     "PerfilCosplayer",
     "Proveedor",

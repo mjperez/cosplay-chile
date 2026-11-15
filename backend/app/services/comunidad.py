@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.events.gestor import EventoDominio, emitir
 from app.models.comunidad import DesafioMensual, ForoRespuesta, ForoTema
 from app.models.usuario import Usuario
 from app.repositories import comunidad as repo
@@ -139,10 +140,23 @@ def desafio_vigente(sesion: Session) -> tuple[DesafioMensual, str | None] | None
     return repo.desafio_por_mes(sesion, mes)
 
 
-def crear_desafio(sesion: Session, datos: DesafioEntrada) -> tuple[DesafioMensual, str | None]:
+def crear_desafio(
+    sesion: Session,
+    datos: DesafioEntrada,
+    id_actor: uuid.UUID | None = None,
+) -> tuple[DesafioMensual, str | None]:
     if repo.desafio_por_mes(sesion, datos.mes) is not None:
         raise MesDuplicado(datos.mes)
     desafio = repo.crear_desafio(sesion, titulo=datos.titulo.strip(), mes=datos.mes)
+    emitir(
+        EventoDominio(
+            tipo="desafio_creado",
+            id_actor=id_actor,
+            id_recurso=desafio.id_desafio,
+            detalle={"titulo": desafio.titulo, "mes": desafio.mes},
+        ),
+        sesion=sesion,
+    )
     return desafio, None
 
 
