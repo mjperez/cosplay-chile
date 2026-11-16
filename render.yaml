@@ -10,8 +10,11 @@ services:
     buildCommand: pip install -r requirements.txt
     # La migración crea unaccent/pg_trgm; el seed es idempotente y solo carga
     # datos si la base está vacía. MEDIA_DIR apunta a /tmp porque el plan free
-    # tiene disco efímero: para persistir imágenes, usar Cloudinary.
+    # tiene disco efímero: regeneramos los 12 SVG en cada arranque, si no, un
+    # reinicio deja /media/seed/*.svg en 404. Para persistir imágenes de
+    # usuarios, usar Cloudinary u otro almacenamiento externo.
     startCommand: >-
+      python -c "from app.core.config import get_settings; from app.seed.imagenes import generar_todas; generar_todas(get_settings().media_path)" &&
       alembic upgrade head &&
       python -m app.seed &&
       uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -42,6 +45,9 @@ services:
     plan: free
     branch: main
     autoDeploy: true
+    # El ajuste de imágenes para móvil (≤640px) vive al final de src/index.css,
+    # ya versionado en main. El parche temporal por buildCommand (ver
+    # DIAGNOSTICO_RENDER.md §7) se retiró al pushear el código.
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
