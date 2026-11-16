@@ -79,6 +79,19 @@ El seed es idempotente: si la base ya tiene usuarios, no vuelve a cargar. Para r
 | Auditoría (admin) | `GET /api/moderacion/auditoria` |
 | Subir imagen | `POST /api/archivos` (multipart, campo `archivo`) |
 
+## Ojo con Render después del cambio de stack
+
+El push dejó `main` en el commit de integración, pero al sondear Render tras el push la API seguía respondiendo con **49 rutas** (la versión anterior) y `/api/salud` daba 404. Antes de la demo hay que:
+
+1. Configurar en el servicio **cosplay-chile-api**:
+   - `DATABASE_URL` con formato **`postgresql+asyncpg://…`** (la vieja URL SQLite no sirve),
+   - `FRONTEND_URL` con la URL pública de `cosplay-chile-web`,
+   - `CORS_ORIGENES_EXTRA` si hace falta otro origen.
+2. Configurar en **cosplay-chile-web**: `VITE_API_URL` con la URL pública de la API.
+3. Hacer **Deploy manual** de ambos servicios y esperar a que `/api/salud` responda 200 y `/openapi.json` muestre **60 rutas**.
+
+Mientras tanto, la forma segura de demostrar el prototipo es la local (`docker compose up --build`).
+
 ## Checklist antes de entrar a clase
 
 - [ ] `docker compose up --build` levanta web y API sin errores.
