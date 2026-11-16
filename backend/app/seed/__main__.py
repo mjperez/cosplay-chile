@@ -41,6 +41,12 @@ async def vaciar(s) -> None:
 
 async def main(reset: bool) -> None:
     settings = get_settings()
+    # Las ilustraciones viven en disco efímero en Render (plan free). El seed es
+    # idempotente: si la BD ya tiene datos, antes se hacía `return` y los SVG no
+    # se regeneraban tras un reinicio, dejando /media/seed/*.svg en 404.
+    # Se generan SIEMPRE, antes de cualquier salida temprana.
+    imagenes = generar_todas(settings.media_path)
+    print(f"Ilustraciones listas: {len(imagenes)} SVG en {settings.media_path}")
     gestor = DatabaseSessionManager()
     gestor.init(settings.database_url)
     try:
@@ -51,7 +57,7 @@ async def main(reset: bool) -> None:
             elif (await s.scalar(select(func.count()).select_from(Usuario))) > 0:
                 print("La base ya tiene datos. Usa --reset para recargar el seed.")
                 return
-            ctx = {"imagenes": generar_todas(settings.media_path)}
+            ctx = {"imagenes": imagenes}
             for etapa in ETAPAS:
                 await etapa(s, ctx)
             await s.commit()
