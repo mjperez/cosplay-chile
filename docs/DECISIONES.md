@@ -153,3 +153,5 @@ Fuente: `design/Cosplay Chile — Frontend.html`. El backend no se modificó. La
 - **D-48 · Cierre de sesión desde una ruta protegida.** React Router 7 navega con transiciones. Si la sesión se
   cerraba antes, `RequiereSesion` alcanzaba a redirigir a `/ingresar`. Ahora la navegación y el cierre van en la
   misma transición (`startTransition`). El error existía antes del rediseño y lo detectó una prueba nueva.
+
+- **D-49 · Bloqueo por intentos fallidos (OWASP A07).** La guía de verificación pide deshabilitar la cuenta tras N intentos inválidos. Se eligió un **bloqueo temporal por cuenta** (5 intentos / 15 minutos) en vez de un bloqueo permanente o un rate limit global por IP: el permanente permitiría a un tercero denegar el acceso a una cuenta ajena a propósito, y el global por IP penalizaría a toda una universidad detrás de un NAT. El contador se reinicia con un login exitoso y los umbrales salen de variables de entorno para poder relajarlos en la demo. El coste es escribir en cada intento fallido; se acepta por ser un prototipo y porque `get_db` no hace commit automático, así que el router confirma explícitamente aun cuando `autenticar` lanza la excepción.

@@ -5,7 +5,7 @@ Plataforma web gratuita para la comunidad cosplay chilena: guías educativas, di
 - **Backend:** Python 3.12+ · FastAPI async · Pydantic · SQLAlchemy 2 async · Alembic · PostgreSQL · JWT + argon2
 - **Frontend:** React 19 · React Router 7 · Tailwind CSS 4 · Leaflet · Vite · Vitest + Testing Library
 - **Patrones:** Singleton, Factory Method, Observer y Adapter (ver [Patrones de diseño](#patrones-de-diseño))
-- **Calidad:** **96 pruebas de backend**, **97% de cobertura**, **59 pruebas de interfaz**, **40/40 comprobaciones HTTP reales** y pipeline de CI con umbral de 90%.
+- **Calidad:** **99 pruebas de backend**, **97% de cobertura**, **59 pruebas de interfaz**, **40/40 comprobaciones HTTP reales** y pipeline de CI con umbral de 90%.
 
 ## Levantar todo con un comando
 

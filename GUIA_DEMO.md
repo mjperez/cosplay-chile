@@ -50,6 +50,12 @@ El seed es idempotente: si la base ya tiene usuarios, no vuelve a cargar. Para r
 
 > Estas cuentas son inseguras por diseño y solo sirven para la demo. Después de clase: borrarlas o cambiar las claves y desactivar el seed.
 
+> **Ojo con el login (OWASP A07):** tras **5 intentos fallidos consecutivos** la cuenta se bloquea **15 minutos**
+> y la API responde `429` con «Demasiados intentos fallidos». Un inicio de sesión correcto reinicia el contador.
+> Si vas a mostrar «clave incorrecta» en el guion, haz **un solo intento** y luego entra con la clave buena;
+> no martillees 5 veces con `camila@demo.cl` o te quedarás sin cuenta para el paso 5. Los umbrales se ajustan
+> con `LOGIN_MAX_INTENTOS` y `LOGIN_BLOQUEO_MINUTOS`.
+
 ## Guion de 12 minutos
 
 1. **Portada (1 min).** Estadísticas reales, buscador con autocompletado («EVA»), filtros rápidos por región y categoría. Mostrar que las cifras vienen de `/api/inicio`.
@@ -60,7 +66,7 @@ El seed es idempotente: si la base ya tiene usuarios, no vuelve a cargar. Para r
 6. **Moderación (2 min).** Entrar como `admin@cosplaychile.cl` → `/moderacion` → aprobar el tutorial (se avisa a toda la comunidad), resolver un reporte con «Ocultar y suspender», publicar el evento sugerido y abrir la **Bitácora**.
 7. **Comunidad y desafíos (1.5 min).** `/comunidad` → responder un tema → ver el aviso al autor. `/desafios` → participar con foto y créditos.
 8. **Perfil y seguridad (1 min).** `/perfil` → editar biografía y región → activar perfil público. `/seguridad` → consejos y formulario de contacto.
-9. **Calidad (1.5 min).** Mostrar `/docs` (60 rutas), `.github/workflows/ci.yml` (96 pruebas, 97% cobertura, 59 pruebas de interfaz) y `CORRECCIONES_ES3.md` (9 hallazgos con evidencia).
+9. **Calidad (1.5 min).** Mostrar `/docs` (60 rutas), `.github/workflows/ci.yml` (99 pruebas, 97% cobertura, 59 pruebas de interfaz) y `CORRECCIONES_ES3.md` (13 hallazgos con evidencia, incluido el bloqueo OWASP A07).
 10. **Cierre (30 s).** Mencionar los cuatro patrones del ES2 y el recorrido HTTP de 40/40.
 
 ## Endpoints útiles para la demo
@@ -79,18 +85,46 @@ El seed es idempotente: si la base ya tiene usuarios, no vuelve a cargar. Para r
 | Auditoría (admin) | `GET /api/moderacion/auditoria` |
 | Subir imagen | `POST /api/archivos` (multipart, campo `archivo`) |
 
-## Ojo con Render después del cambio de stack
+## Render: **arreglado y verificado** (16-11-2026)
 
-El push dejó `main` en el commit de integración, pero al sondear Render tras el push la API seguía respondiendo con **49 rutas** (la versión anterior) y `/api/salud` daba 404. Antes de la demo hay que:
+El deploy `dep-dbtio1utlv9c73acbbb0` quedó **`live`** con el stack integrado. Resultado real:
 
-1. Configurar en el servicio **cosplay-chile-api**:
-   - `DATABASE_URL` con formato **`postgresql+asyncpg://…`** (la vieja URL SQLite no sirve),
-   - `FRONTEND_URL` con la URL pública de `cosplay-chile-web`,
-   - `CORS_ORIGENES_EXTRA` si hace falta otro origen.
-2. Configurar en **cosplay-chile-web**: `VITE_API_URL` con la URL pública de la API.
-3. Hacer **Deploy manual** de ambos servicios y esperar a que `/api/salud` responda 200 y `/openapi.json` muestre **60 rutas**.
+| Comprobación | Antes | Ahora |
+|---|---|---|
+| `GET /api/salud` | 404 | **200** `{"estado":"ok"}` |
+| `GET /api/inicio` | 404 `Not Found` | **200** con estadísticas reales |
+| Rutas en `/openapi.json` | 49 (backend viejo) | **60** |
+| Personas registradas | `—` | **11** |
+| Guías publicadas | `—` | **17** |
+| Profesionales y tiendas | `—` | **23** |
+| Eventos próximos | `—` | **12** |
+| Login `admin@cosplaychile.cl` | — | **200** con JWT |
+| CORS desde `cosplay-chile-web` | — | **`access-control-allow-origin` correcto** |
 
-Mientras tanto, la forma segura de demostrar el prototipo es la local (`docker compose up --build`).
+`bash scripts/verificar_render.sh` → **4 OK**. No hubo que redesplegar la web: su `VITE_API_URL` ya apuntaba bien.
+
+> **Si el navegador sigue mostrando cifras vacías o imágenes viejas**: es caché del
+> navegador (capa 8), no del servidor. Abrir en **ventana de incógnito** o añadir `?v=2`
+> a la URL. Verificado con Chromium limpio: 11/17/23/12 y 0 imágenes rotas.
+>
+> **Imágenes**: las ilustraciones del seed se regeneran en cada arranque, así que
+> sobreviven a los reinicios del plan free (detalle en `DIAGNOSTICO_RENDER.md`).
+
+**Qué se corrigió** (detalle en [`DIAGNOSTICO_RENDER.md`](DIAGNOSTICO_RENDER.md)):
+
+1. El servicio arrastraba el `startCommand` del stack anterior (`python -m app.seed.datos_base` / `app.seed.demo`) y `healthCheckPath: /health`; por eso el deploy anterior terminó en `update_failed`. Se cambió a `alembic upgrade head && python -m app.seed && uvicorn …` y `/api/salud`.
+2. La `DATABASE_URL` apuntaba a un proyecto Supabase que **ya no existe** (`tenant/user not found`). Se sustituyó por el PostgreSQL del equipo en `postgresql+asyncpg://…:5432/postgres?ssl=require`, con las extensiones `unaccent` y `pg_trgm` precreadas en `public`.
+3. Se añadieron `FRONTEND_URL`, `CORS_ORIGENES_EXTRA`, `JWT_EXPIRA_MINUTOS` y `MEDIA_DIR`, conservando el resto de variables.
+
+La automatización completa está en `scripts/arreglar_render.py` (idempotente; usa `RENDER_API_KEY` y `DATABASE_URL`). **Después de clase**: rotar la API key de Render, la contraseña de Supabase y el token de GitHub; desactivar el seed y borrar las cuentas demo.
+
+Como respaldo, la demo local sigue disponible con `docker compose up --build`.
+
+## Ajuste de imágenes en móvil
+
+En pantallas de hasta **640 px** el collage de la portada se reduce de `110vw` a `74vw` y las ilustraciones del seed se muestran completas (`object-fit: contain` con fondo del panel) en vez de recortadas. **Escritorio no cambia**: las reglas están confinadas a `@media (max-width: 640px)` al final de `frontend/src/index.css`.
+
+Para verlo en Render sin caché del CDN, abrir en **incógnito** o añadir `?v=2` a la URL (el mismo truco de la sección anterior). Evidencia: `evidencia/portada_movil_ajuste_final.png`; detalle técnico en `CORRECCIONES_ES3.md` §12.
 
 ## Checklist antes de entrar a clase
 

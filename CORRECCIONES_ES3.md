@@ -121,6 +121,86 @@ core = "sysmon"
 
 ---
 
+## 10. Las ilustraciones del seed desaparecían tras un reinicio en Render
+
+**Hallazgo.** En el prototipo desplegado, las tarjetas de guías, directorio, eventos y comunidad mostraban imágenes rotas: `GET /media/seed/evento.svg` devolvía **404** `{"detail":"Not Found"}`. Se detectó con Chromium en viewport móvil (390×844) recorriendo la página completa.
+
+**Diagnóstico.** `backend/app/seed/__main__.py` llamaba a `generar_todas(settings.media_path)` **después** de la comprobación de idempotencia: si la base ya tenía usuarios, `main()` hacía `return` y no escribía los SVG. Como el plan free de Render tiene disco efímero (`MEDIA_DIR=/tmp/cosplay-media`), cada reinicio de la instancia perdía los archivos sin que el seed los regenerara. No era un defecto exclusivo de móvil: allí se percibía más porque esas ilustraciones se cargan con `loading="lazy"` al hacer scroll.
+
+**Corrección.** Se movió la generación de ilustraciones **antes de cualquier salida temprana** en `app/seed/__main__.py`, y se añadió al `startCommand` de Render una llamada explícita a `generar_todas(get_settings().media_path)` antes de `alembic upgrade head && python -m app.seed`. La generación es idempotente (sobrescribe los 12 SVG) y no toca la base de datos.
+
+**Evidencia.** Deploy `dep-dbtjcoifngtc73cquvdg` → `live`. Los **12 SVG referenciados por la API** responden **200 `image/svg+xml`**. Chromium móvil con scroll completo: **0 imágenes rotas** (antes 3 en la portada y 33 en cinco páginas). `scripts/verificar_render.sh` sigue en **4 OK**. Capturas en `evidencia/`.
+
+---
+
+## 11. El despliegue en Render conservaba la configuración del stack anterior
+
+**Hallazgo.** Tras integrar el ZIP, la portada mostraba «Not Found» y las cuatro cifras quedaban en `—`; `/openapi.json` seguía con 49 rutas.
+
+**Diagnóstico.** Dos causas encadenadas: (a) el servicio `cosplay-chile-api` mantenía el `startCommand` del stack viejo (`python -m app.seed.datos_base` / `app.seed.demo`) y `healthCheckPath: /health`, por lo que el deploy terminaba en `update_failed` y Render seguía sirviendo la versión anterior; (b) su `DATABASE_URL` apuntaba a un proyecto Supabase ya eliminado (`tenant/user not found`).
+
+**Corrección.** Se actualizó el servicio por API: `startCommand` con migración, seed y uvicorn, `healthCheckPath: /api/salud`, y variables `DATABASE_URL` (`postgresql+asyncpg://…:5432/postgres?ssl=require`), `FRONTEND_URL`, `CORS_ORIGENES_EXTRA`, `JWT_EXPIRA_MINUTOS` y `MEDIA_DIR`, conservando las 11 variables existentes. Se precrearon `unaccent` y `pg_trgm` en `public` y se desplegó con caché limpia. La automatización idempotente quedó en `scripts/arreglar_render.py`.
+
+**Evidencia.** Deploy `dep-dbtio1utlv9c73acbbb0` → `live`; `/api/salud` 200, `/api/inicio` 200 con 11/17/23/12, **60 rutas**, login 200 y CORS correcto. Ver `DIAGNOSTICO_RENDER.md`.
+
+---
+
+## 12. Ajuste mínimo de imágenes en móvil (≤ 640px)
+
+**Hallazgo.** En 390×844 las fotos del collage de la portada sufrían un recorte lateral excesivo y las ilustraciones del seed (SVG apaisados de **240×150**) aparecían cortadas dentro de tarjetas verticales. No eran imágenes rotas: respondían 200, pero `object-cover` sobre contenedores de proporción fija descartaba la mayor parte de la escena. Era un problema de presentación heredado del diseño, no del despliegue.
+
+**Alcance.** Se autorizó un ajuste **mínimo y exclusivo de móvil**. El diseño de escritorio queda intacto: las tres reglas viven dentro de `@media (max-width: 640px)` al final de `frontend/src/index.css`.
+
+**Corrección.**
+
+| Selector | Antes | Después |
+|---|---|---|
+| `div[aria-hidden='true']:has(> img + img)` | `height: min(560px, 110vw)` | `min(560px, 74vw) !important` |
+| `div[aria-hidden='true']:has(> img + img) > img` | `object-position: 50% 50%` | `50% 30% !important` |
+| `img[src*='/media/seed/']` | `object-fit: cover` | `contain !important` + fondo `#160c34` |
+
+En 390 px el collage pasa de ~217×429 (ratio 0,51) a **~217×289** (ratio 0,75). El comentario `ajuste-movil-es3` sirve de marcador para que el build sea idempotente.
+
+**Despliegue.** En un primer momento no había credenciales de Git para llevar el cambio a `main`, y Render construye desde el repositorio. Se actualizó el `buildCommand` de `cosplay-chile-web` por la API de Render para que añada el bloque (codificado en base64, sólo si el marcador no existe) antes de `npm ci && npm run build`, y se disparó un deploy con caché limpia. Detalle del contrato de la API en `DIAGNOSTICO_RENDER.md` §7.
+
+**Cierre (16-11, más tarde).** Ya se pudo pushear a `main`: el bloque móvil quedó versionado en `frontend/src/index.css`, el `buildCommand` volvió a `npm ci && npm run build` y el parche temporal se retiró. El marcador `ajuste-movil-es3` se conserva igualmente porque hace idempotente cualquier rebuild.
+
+**Evidencia.** Deploy `dep-dbtjk0u1egvs73b4vmsg` → `live`. Se sirve `index-B7RbawAk.css` (75.429 bytes) e `index-BiZJm7rM.js`, idénticos al build local; `npm test` → **59/59**. Chromium 390×844 con scroll completo: collage **350×289**, 3/3 SVG con `object-fit: contain`, **0 imágenes rotas**, 0 errores JS, cifras 11/17/23/12. Control en 1440×900: collage **560 px**, `object-position: 50% 50%`, SVG con `cover` → **escritorio sin cambios**. Captura en `evidencia/portada_movil_ajuste_final.png`.
+
+**Nota de consistencia.** `scripts/arreglar_render.py` y `render.yaml` conservan el prefijo de regeneración de SVG en `startCommand`, de modo que re-ejecutar el script de rescate ya no pisa la corrección de la §10.
+
+---
+
+## 13. Bloqueo temporal por intentos fallidos de login (OWASP A07)
+
+**Hallazgo.** La «Guía de verificación de seguridad OWASP» pide deshabilitar la cuenta tras un número
+establecido de intentos inválidos (ejemplo: cinco). Verificado en vivo contra Render: 8 intentos con clave
+errónea devolvían `[401, 401, 401, 401, 401, 401, 401, 401]` — sin `429` ni bloqueo. Era la única brecha
+relevante de A01–A03/A07 en el prototipo.
+
+**Corrección.** Se añadieron dos columnas a `usuario` (`intentos_fallidos`, `bloqueado_hasta`) mediante la
+migración `0002_rate_limiting_login.py`, y `auth_service.autenticar` ahora:
+
+| Situación | Respuesta |
+|---|---|
+| Cuenta con `bloqueado_hasta` vigente | `429` + `CUENTA_BLOQUEADA` (sin procesar la clave) |
+| Intento fallido | `401` genérico y contador +1 (solo si el correo existe) |
+| Contador llega a `login_max_intentos` (5) | `bloqueado_hasta = ahora + login_bloqueo_minutos` (15) |
+| Login exitoso | contador a 0 y `bloqueado_hasta = None` |
+| Correo no registrado | siempre `401`, sin contador (no enumera cuentas) |
+
+Ambos umbrales son variables de entorno (`LOGIN_MAX_INTENTOS`, `LOGIN_BLOQUEO_MINUTOS`), no constantes en
+el código. El router persiste el contador con `commit()` **incluso cuando `autenticar` lanza la excepción**
+(`try/except HTTPException`), porque `get_db` no hace commit automático. El cliente ya mostraba los objetos
+`detail` con `mensaje`/`codigo` (`ApiError`), así que el `429` se pinta como alerta en español sin tocar la UI.
+
+**Evidencia.** `tests/test_auth.py`: 3 pruebas nuevas (bloqueo tras 5, reinicio tras login exitoso, correo
+inexistente nunca se bloquea). Suite completa **99 pruebas en verde, 97% de cobertura** con Python 3.12 +
+`sysmon` (umbral de CI: 90%). Migración aplicada en el despliegue con `alembic upgrade head`; es aditiva y
+no destruye datos (`server_default='0'`, columna nullable).
+
+---
+
 ## Marco normativo aplicado
 
 | Norma / estándar | Aplicación en el prototipo |
@@ -130,6 +210,7 @@ core = "sysmon"
 | **OWASP A01** | Rutas protegidas, 401 genérico, redirección `siguiente` limitada a rutas internas, supresión sin enumeración de cuentas |
 | **OWASP A02** | JWT con secreto por entorno, contraseñas argon2id, tokens de recuperación guardados como hash, secretos fuera del repositorio |
 | **OWASP A03** | Validación Pydantic, URLs restringidas a http(s), tipo de imagen por firma binaria, escape en la descarga HTML, parámetros SQL ORM |
+| **OWASP A07** | Bloqueo temporal tras 5 intentos fallidos de login, contador por cuenta, umbrales por entorno (§13) |
 | **Ley 19.223** de delitos informáticos | Bitácora de auditoría y trazabilidad de acciones de moderación |
 | **Ley 21.719** de protección de datos | Consentimiento explícito con fecha, finalidad informada, opt-in al directorio y derecho a supresión |
 
@@ -140,7 +221,7 @@ core = "sysmon"
 ```bash
 # Backend (PostgreSQL local o servicio del CI)
 cd backend
-python -m pytest -q --cov=app --cov-fail-under=90
+python -m pytest -q --cov=app --cov-fail-under=90   # 99 pruebas, 97% de cobertura
 
 # Frontend
 cd frontend
