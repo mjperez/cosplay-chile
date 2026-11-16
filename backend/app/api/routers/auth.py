@@ -1,5 +1,5 @@
 """Módulo Registro y Autenticación: UC-01 Identificarse (RF-07, RF-09, RF-10)."""
-from fastapi import APIRouter, BackgroundTasks, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
 from app.core.deps import DbSession, Gestor, UsuarioActual
 from app.core.security import crear_token_acceso
@@ -30,10 +30,20 @@ async def registro(datos: RegistroIn, db: DbSession, gestor: Gestor, tareas: Bac
 
 
 @router.post("/login", response_model=TokenOut,
-             responses={401: {"description": "Datos incorrectos"}, 403: {"description": "Cuenta suspendida"}},
+             responses={
+                 401: {"description": "Datos incorrectos"},
+                 403: {"description": "Cuenta suspendida"},
+                 429: {"description": "Cuenta bloqueada temporalmente por intentos fallidos"},
+             },
              summary="Iniciar sesión (UC-01)")
 async def login(datos: LoginIn, db: DbSession):
-    usuario = await auth_service.autenticar(db, datos.email, datos.password)
+    # OWASP A07: persistir el contador de intentos fallidos incluso si el login falla
+    try:
+        usuario = await auth_service.autenticar(db, datos.email, datos.password)
+    except HTTPException:
+        await db.commit()
+        raise
+    await db.commit()
     return _token(usuario)
 
 

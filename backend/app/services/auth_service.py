@@ -61,11 +61,43 @@ async def registrar(db: AsyncSession, datos: RegistroIn) -> Usuario:
 
 
 async def autenticar(db: AsyncSession, email: str, password: str) -> Usuario:
-    """Pasos 3-4 de UC-01. Lanza 401 genérico o 403 si la cuenta está suspendida."""
+    """Pasos 3-4 de UC-01. Lanza 401 genérico o 403 si la cuenta está suspendida.
+
+    OWASP A07: tras N intentos fallidos consecutivos (login_max_intentos),
+    la cuenta se bloquea temporalmente durante login_bloqueo_minutos.
+    """
+    s = get_settings()
+    ahora = datetime.now(timezone.utc)
     usuario = await buscar_por_email(db, email)
+
+    # Si la cuenta existe y está bloqueada, rechazar sin procesar la contraseña
+    if usuario is not None and usuario.bloqueado_hasta is not None and usuario.bloqueado_hasta > ahora:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            {
+                "codigo": "CUENTA_BLOQUEADA",
+                "mensaje": (
+                    f"Demasiados intentos fallidos. Intenta nuevamente en "
+                    f"{int((usuario.bloqueado_hasta - ahora).total_seconds() // 60) + 1} minutos."
+                ),
+            },
+        )
+
     valido = verificar_password(password, usuario.password_hash if usuario else None)
     if usuario is None or not valido or usuario.estado == EstadoUsuario.ELIMINADO:
+        # Incrementar contador solo si el usuario existe (no revela correos no registrados)
+        if usuario is not None and usuario.estado != EstadoUsuario.ELIMINADO:
+            usuario.intentos_fallidos += 1
+            if usuario.intentos_fallidos >= s.login_max_intentos:
+                usuario.bloqueado_hasta = ahora + timedelta(minutes=s.login_bloqueo_minutos)
+            await db.flush()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, DATOS_INCORRECTOS)
+
+    # Login exitoso: reiniciar contador
+    usuario.intentos_fallidos = 0
+    usuario.bloqueado_hasta = None
+    await db.flush()
+
     # La suspensión se revela solo con credenciales correctas (no filtra qué correos existen)
     if usuario.estado == EstadoUsuario.SUSPENDIDO:
         raise HTTPException(

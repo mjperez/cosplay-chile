@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,9 @@ class Usuario(IdMixin, CreadoMixin, Base):
     motivo_suspension: Mapped[str | None] = mapped_column(Text)
     # RNF-11 / Ley 21.719: fecha del consentimiento explícito
     consentimiento_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # OWASP A07: contador de intentos fallidos y bloqueo temporal
+    intentos_fallidos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    bloqueado_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     perfil: Mapped["Perfil"] = relationship(
         back_populates="usuario", uselist=False, cascade="all, delete-orphan", lazy="selectin"

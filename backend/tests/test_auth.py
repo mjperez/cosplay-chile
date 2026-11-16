@@ -176,3 +176,44 @@ async def test_token_de_admin_incluye_rol(client, admin):
     headers = await token_de(client, admin.email)
     token = headers["Authorization"].split()[1]
     assert decodificar_token(token)["rol"] == "ADMIN"
+
+
+# ---------------------------------------------------------------- Rate limiting (OWASP A07)
+
+
+async def test_login_bloquea_tras_5_intentos_fallidos(client, usuario):
+    """OWASP A07: tras 5 intentos fallidos consecutivos, la cuenta se bloquea temporalmente."""
+    for i in range(5):
+        r = await client.post("/api/auth/login", json={"email": "camila@test.cl", "password": f"Mala{i}123"})
+        assert r.status_code == 401, f"intento {i+1}: esperado 401, got {r.status_code}"
+    # El 6º intento (incluso con clave correcta) debe devolver 429
+    r = await client.post("/api/auth/login", json={"email": "camila@test.cl", "password": PASSWORD})
+    assert r.status_code == 429
+    detalle = r.json()["detail"]
+    assert detalle["codigo"] == "CUENTA_BLOQUEADA"
+    assert "intentos" in detalle["mensaje"].lower() or "minutos" in detalle["mensaje"].lower()
+
+
+async def test_login_exitoso_reinicia_contador(client, usuario):
+    """Un login exitoso debe reiniciar el contador de intentos fallidos."""
+    # 3 intentos fallidos (por debajo del umbral de 5)
+    for i in range(3):
+        await client.post("/api/auth/login", json={"email": "camila@test.cl", "password": f"Mala{i}123"})
+    # Login exitoso
+    r = await client.post("/api/auth/login", json={"email": "camila@test.cl", "password": PASSWORD})
+    assert r.status_code == 200
+    # Ahora debe tolerar otros 5 intentos antes del bloqueo
+    for i in range(5):
+        r = await client.post("/api/auth/login", json={"email": "camila@test.cl", "password": f"Mala{i}123"})
+        assert r.status_code == 401, f"intento {i+1}: esperado 401, got {r.status_code}"
+    r = await client.post("/api/auth/login", json={"email": "camila@test.cl", "password": PASSWORD})
+    assert r.status_code == 429
+
+
+async def test_correo_inexistente_no_se_bloquea(client):
+    """Un correo no registrado no debe registrar intentos (no filtra qué correos existen)."""
+    for i in range(8):
+        r = await client.post("/api/auth/login", json={"email": "nadie@test.cl", "password": f"Mala{i}123"})
+        assert r.status_code == 401
+    # Siempre 401, nunca 429 (no hay cuenta que bloquear)
+    assert r.status_code == 401

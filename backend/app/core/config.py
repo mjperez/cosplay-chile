@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     jwt_expira_minutos: int = 60
     recuperacion_expira_minutos: int = 30
 
+    # OWASP A07: bloqueo temporal tras N intentos fallidos de login
+    login_max_intentos: int = 5
+    login_bloqueo_minutos: int = 15
+
     frontend_url: str = "http://localhost:5173"
     cors_origenes_extra: str = ""
 
