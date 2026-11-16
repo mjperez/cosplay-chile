@@ -184,3 +184,28 @@ select option {
   .prosa ul { @apply mb-4 list-disc space-y-1 pl-6; }
   .prosa ol { @apply mb-4 list-decimal space-y-1 pl-6; }
 }
+/* ajuste-movil-es3: marcador de idempotencia (el build no duplica el bloque) */
+/* ---------------------------------------------------------------------------
+ * Ajustes mínimos de imagen para móvil (≤ 640px).
+ * El diseño usa `object-cover` sobre contenedores de proporción fija. En
+ * pantallas angostas el recorte lateral era excesivo. Estas reglas solo
+ * reducen la altura del collage de la portada y muestran completas las
+ * ilustraciones SVG del seed; escritorio queda intacto.
+ * ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  /* Collage de la portada: 110vw dejaba las fotos 640×854 en ~217×429
+     (ratio 0,51). Con 74vw quedan ~217×289 (ratio 0,75), sin recorte. */
+  div[aria-hidden='true']:has(> img + img) {
+    height: min(560px, 74vw) !important;
+  }
+  div[aria-hidden='true']:has(> img + img) > img {
+    object-position: 50% 30% !important;
+  }
+
+  /* Las ilustraciones del seed son 240×150 (apaisadas) y se pintaban en
+     tarjetas verticales: object-cover recortaba ~3/4 de la escena. */
+  img[src*='/media/seed/'] {
+    object-fit: contain !important;
+    background-color: #160c34;
+  }
+}
