@@ -1,367 +1,207 @@
-#!/usr/bin/env python3
-"""Recorrido extremo a extremo real sobre HTTP (sin TestClient).
+"""Recorrido extremo a extremo reproducible sobre la API real del prototipo.
 
-Prepara una base SQLite temporal, aplica `alembic upgrade head`, carga las dos
-semillas, levanta `uvicorn` en un puerto libre y ejecuta peticiones HTTP reales
-con `httpx`. Es la verificación que se cita en `GUIA_DEMO.md` y en
-`tests/casos_por_rf.md`; no forma parte de `pytest` porque necesita un proceso
-servidor y un esquema propio.
+Crea una base de datos de prueba aislada (`cosplay_recorrido`), aplica la
+migración de producción, carga el seed y ejecuta comprobaciones HTTP con
+`httpx.ASGITransport` (sin levantar uvicorn ni tocar la base de desarrollo).
 
-Uso:
-
-    cd backend && .venv/bin/python scripts/recorrido_http.py
-
-Sale con 0 si todas las comprobaciones pasan y con 1 en caso contrario.
+Uso, desde `backend/`:
+    python scripts/recorrido_http.py
 """
-
-from __future__ import annotations
-
+import asyncio
 import base64
 import os
-import socket
-import subprocess
+import pathlib
 import sys
 import tempfile
-import time
-from pathlib import Path
+from datetime import date, timedelta
 
-import httpx
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
-RAIZ = Path(__file__).resolve().parents[1]
-PUERTO = 8791
-BASE = f"http://127.0.0.1:{PUERTO}"
-API = f"{BASE}/api/v1"
+BASE = "postgresql+asyncpg://cosplay:cosplay@localhost:5432"
+NOMBRE_BD = "cosplay_recorrido"
+URL = f"{BASE}/{NOMBRE_BD}"
+RAIZ = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(RAIZ))
 
-# PNG 1x1 válido: empieza con la firma \x89PNG\r\n\x1a\n.
-PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
-    "z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="
-)
+TMP = pathlib.Path(tempfile.mkdtemp(prefix="cosplay-recorrido-"))
+os.environ.update({
+    "DATABASE_URL": URL,
+    "TEST_DATABASE_URL": URL,
+    "JWT_SECRET": "secreto-del-recorrido-con-mas-de-16-caracteres",
+    "FRONTEND_URL": "http://localhost:5173",
+    "MEDIA_DIR": str(TMP / "media"),
+    "STORAGE_BACKEND": "local",
+})
 
-resultados: list[tuple[bool, str, str]] = []
-
-
-def check(nombre: str, condicion: bool, detalle: str = "") -> None:
-    resultados.append((bool(condicion), nombre, detalle))
-    marca = "OK  " if condicion else "FAIL"
-    print(f"[{marca}] {nombre}" + (f" · {detalle}" if detalle else ""))
+RESULTADOS = []
 
 
-def entorno(directorio: Path) -> dict[str, str]:
-    env = os.environ.copy()
-    env.update(
-        {
-            "DATABASE_URL": f"sqlite+pysqlite:///{(directorio / 'demo.db').as_posix()}",
-            "JWT_SECRET": "clave-de-recorrido-con-mas-de-16-caracteres",
-            "ENVIRONMENT": "local",
-            "BCRYPT_ROUNDS": "4",
-            "DEMO_SEED": "1",
-            "STORAGE_BACKEND": "local",
-            "STORAGE_DIRECTORIO": str(directorio / "archivos"),
-            "CORS_ORIGINS": "http://localhost:5173",
-        }
+def comprobar(nombre: str, condicion: bool) -> None:
+    RESULTADOS.append((nombre, bool(condicion)))
+    print(("  OK   " if condicion else "  FALLO") + "  " + nombre)
+
+
+async def _crear_base() -> None:
+    engine = create_async_engine(f"{BASE}/postgres", isolation_level="AUTOCOMMIT")
+    async with engine.connect() as c:
+        await c.execute(text("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                             f"WHERE datname = '{NOMBRE_BD}' AND pid <> pg_backend_pid()"))
+        await c.execute(text(f"DROP DATABASE IF EXISTS {NOMBRE_BD}"))
+        await c.execute(text(f"CREATE DATABASE {NOMBRE_BD} OWNER cosplay"))
+    await engine.dispose()
+
+
+def preparar_base() -> None:
+    """Se ejecuta fuera del event loop: alembic/env.py usa asyncio.run()."""
+    asyncio.run(_crear_base())
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(RAIZ / "alembic.ini"))
+    cfg.set_main_option("script_location", str(RAIZ / "alembic"))
+    cfg.attributes["database_url"] = URL
+    command.upgrade(cfg, "head")
+
+
+async def sembrar() -> None:
+    from app.db.session_manager import DatabaseSessionManager
+    from app.seed.base import seed_base
+    from app.seed.comunidad import seed_comunidad
+    from app.seed.contenidos import seed_contenidos
+    from app.seed.imagenes import generar_todas
+
+    gestor = DatabaseSessionManager()
+    gestor.init(URL)
+    ctx = {"imagenes": generar_todas(TMP / "media")}
+    async with gestor.session() as s:
+        await seed_base(s, ctx)
+        await seed_contenidos(s, ctx)
+        await seed_comunidad(s, ctx)
+        await s.commit()
+
+
+async def main() -> int:
+    await sembrar()
+
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+
+    PNG = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="
     )
-    return env
+    (TMP / "prueba.png").write_bytes(PNG)
 
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://recorrido") as c:
+        print("== Catálogos públicos ==")
+        r = await c.get("/api/salud")
+        comprobar("salud responde 200", r.status_code == 200)
+        r = await c.get("/api/inicio")
+        comprobar("portada con estadísticas", r.status_code == 200 and r.json()["estadisticas"]["guias"] > 0)
+        comprobar("categorías", len((await c.get("/api/categorias")).json()) == 12)
+        comprobar("metadatos de regiones", bool((await c.get("/api/meta")).json()["regiones"]))
+        r = await c.get("/api/contenidos")
+        comprobar("guías publicadas", r.status_code == 200 and r.json()["total"] > 0)
+        comprobar("directorio", (await c.get("/api/directorio")).json()["total"] > 0)
+        comprobar("mapa con coordenadas", bool((await c.get("/api/directorio/mapa")).json()))
+        comprobar("eventos", (await c.get("/api/eventos")).json()["total"] > 0)
+        comprobar("foros", len((await c.get("/api/foros")).json()) >= 2)
+        comprobar("desafíos", bool((await c.get("/api/desafios")).json()))
+        comprobar("ruta inexistente da 404", (await c.get("/api/no-existe")).status_code == 404)
 
-def esperar_servicio(cliente: httpx.Client, proceso: subprocess.Popen) -> bool:
-    for _ in range(60):
-        if proceso.poll() is not None:
-            return False
-        try:
-            if cliente.get("/health", timeout=1).status_code == 200:
-                return True
-        except httpx.HTTPError:
-            pass
-        time.sleep(0.5)
-    return False
+        print("== Autenticación y roles ==")
+        admin = await c.post("/api/auth/login", json={"email": "admin@cosplaychile.cl", "password": "Admin2026!"})
+        comprobar("login de administración", admin.status_code == 200)
+        A = {"Authorization": f"Bearer {admin.json()['access_token']}"}
+        camila = await c.post("/api/auth/login", json={"email": "camila@demo.cl", "password": "Cosplay2026!"})
+        comprobar("login de cosplayer", camila.status_code == 200)
+        U = {"Authorization": f"Bearer {camila.json()['access_token']}"}
+        comprobar("sesión actual", (await c.get("/api/auth/me", headers=U)).status_code == 200)
+        comprobar("sin token da 401", (await c.get("/api/moderacion/resumen")).status_code == 401)
+        comprobar("cosplayer no entra a moderación", (await c.get("/api/moderacion/resumen", headers=U)).status_code == 403)
+        comprobar("admin ve el resumen", (await c.get("/api/moderacion/resumen", headers=A)).status_code == 200)
+        comprobar("cuenta suspendida no entra", (await c.post("/api/auth/login", json={
+            "email": "suspendido@demo.cl", "password": "Cosplay2026!"})).status_code == 403)
+        comprobar("contraseña débil da 422", (await c.post("/api/auth/registro", json={
+            "nombre": "Nueva persona", "email": "nueva@test.cl", "password": "debil",
+            "acepta_privacidad": True})).status_code == 422)
 
+        print("== Comunidad, avisos y favoritos ==")
+        foros = (await c.get("/api/foros")).json()
+        tema = await c.post(f"/api/foros/{foros[0]['slug']}/temas", headers=U, json={
+            "titulo": "Tema del recorrido", "contenido": "Les cuento cómo armé mi primera armadura"})
+        comprobar("crear tema", tema.status_code == 201)
+        respondido = await c.post(f"/api/temas/{tema.json()['id']}/respuestas", headers=A,
+                                  json={"contenido": "¡Qué buen trabajo!"})
+        comprobar("responder tema", respondido.status_code == 201)
+        bandeja = (await c.get("/api/notificaciones", headers=U)).json()
+        comprobar("aviso interno al autor", bandeja["no_leidas"] >= 1 and bool(bandeja["items"]))
+        comprobar("marcar todos los avisos", (await c.post("/api/notificaciones/leer-todas", headers=U)).status_code == 200)
+        comprobar("bitácora de auditoría", bool((await c.get("/api/moderacion/auditoria", headers=A)).json()))
 
-def main() -> int:
-    with tempfile.TemporaryDirectory(prefix="cosplay-recorrido-") as temporal:
-        directorio = Path(temporal)
-        env = entorno(directorio)
+        contenido = (await c.get("/api/contenidos")).json()["items"][0]
+        comprobar("guardar favorito", (await c.post("/api/favoritos", headers=U, json={
+            "tipo": "CONTENIDO", "objeto_id": contenido["id"]})).status_code == 201)
+        comprobar("listar favoritos", any(f["objeto_id"] == contenido["id"]
+                                          for f in (await c.get("/api/favoritos", headers=U)).json()))
 
-        for comando in (
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            [sys.executable, "-m", "app.seed.datos_base"],
-            [sys.executable, "-m", "app.seed.demo"],
-        ):
-            paso = subprocess.run(
-                comando, cwd=RAIZ, env=env, capture_output=True, text=True
-            )
-            if paso.returncode != 0:
-                print(f"No se pudo preparar la base: {' '.join(comando)}")
-                print(paso.stdout[-2000:])
-                print(paso.stderr[-2000:])
-                return 1
+        print("== Contenido, eventos, reportes y contacto ==")
+        cats = (await c.get("/api/categorias")).json()
+        envio = await c.post("/api/contenidos", headers=U, json={
+            "tipo": "GUIA", "titulo": "Guía del recorrido", "descripcion": "Una guía de prueba",
+            "nivel": "PRINCIPIANTE", "categoria_id": cats[0]["id"],
+            "pasos": ["Medir", "Cortar"], "materiales": ["Goma EVA"]})
+        comprobar("enviar tutorial a revisión", envio.status_code == 201)
+        id_contenido = envio.json()["contenido"]["id"]
+        comprobar("aparece en la cola", any(x["id"] == id_contenido
+                                           for x in (await c.get("/api/moderacion/contenidos", headers=A)).json()))
+        comprobar("publicar tutorial", (await c.post(
+            f"/api/moderacion/contenidos/{id_contenido}/publicar", headers=A)).status_code == 200)
 
-        with socket.socket() as zocalo:
-            zocalo.bind(("127.0.0.1", 0))
-            puerto_libre = zocalo.getsockname()[1]
-        global PUERTO, BASE, API
-        PUERTO = puerto_libre
-        BASE = f"http://127.0.0.1:{PUERTO}"
-        API = f"{BASE}/api/v1"
+        sugerencia = await c.post("/api/eventos/sugerir", headers=U, json={
+            "nombre": "Meetup del recorrido", "descripcion": "Encuentro de prueba", "tipo": "MEETUP",
+            "fecha_inicio": (date.today() + timedelta(days=15)).isoformat(),
+            "lugar": "Santiago", "region": "RM"})
+        comprobar("sugerir evento", sugerencia.status_code == 201)
 
-        proceso = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "uvicorn",
-                "app.main:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(PUERTO),
-                "--log-level",
-                "warning",
-            ],
-            cwd=RAIZ,
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
+        evento = (await c.get("/api/eventos")).json()["items"][0]
+        reporte = await c.post("/api/reportes", headers=U, json={
+            "tipo_objeto": "EVENTO", "objeto_id": evento["id"],
+            "motivo": "ACTUALIZACION_EVENTO", "detalle": "Cambió la dirección"})
+        comprobar("reportar contenido", reporte.status_code == 201)
+        comprobar("cola de reportes", bool((await c.get("/api/moderacion/reportes", headers=A)).json()))
+        contacto = await c.post("/api/contacto", json={
+            "nombre": "Persona", "email": "persona@test.cl", "tipo": "DUDA",
+            "asunto": "Consulta", "mensaje": "Quisiera saber más sobre los talleres"})
+        comprobar("formulario de contacto", contacto.status_code == 201)
+        comprobar("bandeja de contactos", bool((await c.get("/api/moderacion/contactos", headers=A)).json()))
 
-        try:
-            with httpx.Client(base_url=BASE, timeout=10) as cliente:
-                if not esperar_servicio(cliente, proceso):
-                    print("El servidor no levantó a tiempo.")
-                    if proceso.stderr:
-                        print(proceso.stderr.read().decode(errors="replace")[-2000:])
-                    return 1
+        print("== Archivos (Adapter) y OpenAPI ==")
+        subida = await c.post("/api/archivos", headers=U,
+                              files={"archivo": ("prueba.png", PNG, "image/png")})
+        comprobar("subir PNG", subida.status_code == 201)
+        if subida.status_code == 201:
+            enlace = subida.json()["url"]
+            comprobar("servir el archivo", (await c.get(enlace)).status_code == 200)
+            clave = subida.json()["clave"]
+            fabricado = await c.post("/api/archivos", headers=U,
+                                     files={"archivo": ("falso.svg", b"<svg></svg>", "image/svg+xml")})
+            comprobar("rechazar SVG disfrazado", fabricado.status_code == 415)
+            comprobar("la clave del archivo es única", clave.startswith("subidas/"))
 
-                # --- 1. Salud y contrato ----------------------------------
-                r = cliente.get("/health")
-                check("GET /health responde 200 con status ok",
-                      r.status_code == 200 and r.json().get("status") == "ok")
-                check("GET /health reporta el entorno local",
-                      r.json().get("environment") == "local")
+        esquema = (await c.get("/openapi.json")).json()
+        rutas = sorted(esquema["paths"])
+        comprobar(f"OpenAPI con {len(rutas)} rutas", len(rutas) == 60)
+        comprobar("rutas clave presentes", all(p in esquema["paths"] for p in (
+            "/api/inicio", "/api/meta", "/api/busqueda/sugerencias", "/api/notificaciones",
+            "/api/favoritos", "/api/reportes", "/api/contacto", "/api/moderacion/auditoria")))
 
-                esquema = cliente.get("/openapi.json")
-                rutas = esquema.json().get("paths", {}) if esquema.status_code == 200 else {}
-                check("OpenAPI expone 49 rutas", len(rutas) == 49, f"{len(rutas)} rutas")
-                for nueva in (
-                    "/api/v1/notificaciones/sin-leer",
-                    "/api/v1/archivos",
-                    "/api/v1/admin/auditoria",
-                ):
-                    check(f"OpenAPI incluye {nueva}", nueva in rutas)
-
-                check("GET /docs responde 200", cliente.get("/docs").status_code == 200)
-
-                # --- 2. Autenticación y autorización -----------------------
-                def login(correo: str, password: str = "Demo2026!") -> httpx.Response:
-                    return cliente.post(
-                        f"{API}/auth/login", json={"correo": correo, "password": password}
-                    )
-
-                admin = login("demo@cosplay.cl")
-                cosplayer = login("cosplayer@cosplay.cl")
-                organizador = login("organizador@cosplay.cl")
-                check("Login del administrador demo", admin.status_code == 200)
-                check("Login del cosplayer demo", cosplayer.status_code == 200)
-                check("Login del organizador demo", organizador.status_code == 200)
-                check("Login con contraseña incorrecta da 401",
-                      login("demo@cosplay.cl", "incorrecta").status_code == 401)
-
-                t_admin = admin.json()["access_token"]
-                t_cos = cosplayer.json()["access_token"]
-                H_ADMIN = {"Authorization": f"Bearer {t_admin}"}
-                H_COS = {"Authorization": f"Bearer {t_cos}"}
-
-                check("GET /auth/me con token devuelve rol administrador",
-                      cliente.get(f"{API}/auth/me", headers=H_ADMIN).json().get("rol")
-                      == "administrador")
-                check("GET /auth/me sin token da 401",
-                      cliente.get(f"{API}/auth/me").status_code == 401)
-                check("GET /admin/resumen sin token da 401",
-                      cliente.get(f"{API}/admin/resumen").status_code == 401)
-                check("GET /admin/resumen con cosplayer da 403",
-                      cliente.get(f"{API}/admin/resumen", headers=H_COS).status_code == 403)
-                check("GET /admin/resumen con admin da 200",
-                      cliente.get(f"{API}/admin/resumen", headers=H_ADMIN).status_code == 200)
-                check("GET /admin/auditoria con cosplayer da 403",
-                      cliente.get(f"{API}/admin/auditoria", headers=H_COS).status_code == 403)
-
-                # --- 3. Catálogos y módulos --------------------------------
-                check("GET /proveedores trae las 20 fichas reales",
-                      cliente.get(f"{API}/proveedores").json().get("total") == 20)
-                check("GET /contenido lista los publicados",
-                      cliente.get(f"{API}/contenido").status_code == 200)
-                check("GET /eventos responde 200", cliente.get(f"{API}/eventos").status_code == 200)
-                check("GET /foro/temas responde 200", cliente.get(f"{API}/foro/temas").status_code == 200)
-                check("GET /desafios/vigente responde 200",
-                      cliente.get(f"{API}/desafios/vigente").status_code == 200)
-                check("GET /tiendas responde 200", cliente.get(f"{API}/tiendas").status_code == 200)
-                check("GET /grupos responde 200", cliente.get(f"{API}/grupos").status_code == 200)
-                check("GET /perfiles/mio con sesión responde 200",
-                      cliente.get(f"{API}/perfiles/mio", headers=H_COS).status_code == 200)
-                check("GET /admin/usuarios con admin responde 200",
-                      cliente.get(f"{API}/admin/usuarios", headers=H_ADMIN).status_code == 200)
-
-                # --- 4. Adapter: subida de imágenes ------------------------
-                check("POST /archivos sin token da 401",
-                      cliente.post(f"{API}/archivos",
-                                   files={"archivo": ("f.png", PNG, "image/png")}).status_code == 401)
-
-                subida = cliente.post(
-                    f"{API}/archivos",
-                    files={"archivo": ("foto.png", PNG, "image/png")},
-                    headers=H_COS,
-                )
-                check("POST /archivos con PNG válido da 201", subida.status_code == 201)
-                enlace = subida.json().get("enlace", "") if subida.status_code == 201 else ""
-                check("El enlace devuelto es una URL absoluta", enlace.startswith("http"))
-                check("POST /archivos con SVG que dice PNG da 415",
-                      cliente.post(f"{API}/archivos",
-                                   files={"archivo": ("falso.png", b"<svg onload='x'/>", "image/png")},
-                                   headers=H_COS).status_code == 415)
-                check("POST /archivos con archivo vacío da 400",
-                      cliente.post(f"{API}/archivos",
-                                   files={"archivo": ("vacio.png", b"", "image/png")},
-                                   headers=H_COS).status_code == 400)
-
-                servido = cliente.get(enlace) if enlace else None
-                check("GET del enlace sirve la imagen",
-                      servido is not None and servido.status_code == 200
-                      and servido.content.startswith(b"\x89PNG"))
-
-                # Borrado ajeno y propio.
-                subida_admin = cliente.post(
-                    f"{API}/archivos",
-                    files={"archivo": ("admin.png", PNG, "image/png")},
-                    headers=H_ADMIN,
-                )
-                id_admin = subida_admin.json().get("identificador", "")
-                check("Un cosplayer no puede borrar la imagen del admin (403)",
-                      cliente.delete(f"{API}/archivos/{id_admin}", headers=H_COS).status_code == 403)
-
-                id_propio = subida.json().get("identificador", "")
-                check("El dueño borra su imagen (204)",
-                      cliente.delete(f"{API}/archivos/{id_propio}", headers=H_COS).status_code == 204)
-                check("Borrar dos veces da 404",
-                      cliente.delete(f"{API}/archivos/{id_propio}", headers=H_COS).status_code == 404)
-
-                # --- 5. Factory + Observer: enviar tutorial ----------------
-                payload = {
-                    "tipo": "guia",
-                    "titulo": "Guía de prueba ES3 con imagen",
-                    "resumen": "Recorrido HTTP real",
-                    "nivel": "basico",
-                    "cuerpo": "<p>Contenido de prueba</p>",
-                    "imagenes": [enlace],
-                    "video_url": None,
-                    "id_categoria": None,
-                    "personaje": "Personaje de prueba",
-                    "pasos": ["Trazo", "Corte"],
-                }
-                creado = cliente.post(f"{API}/contenido", json=payload, headers=H_COS)
-                check("POST /contenido crea el borrador (201)", creado.status_code == 201,
-                      str(creado.status_code))
-                datos_creados = creado.json() if creado.status_code == 201 else {}
-                check("El borrador queda en estado pendiente",
-                      datos_creados.get("estado") == "pendiente")
-                check("El borrador conserva la imagen subida",
-                      enlace in (datos_creados.get("imagenes") or []))
-                check("POST /contenido con nivel inválido da 422",
-                      cliente.post(f"{API}/contenido",
-                                   json={**payload, "nivel": "principiante"},
-                                   headers=H_COS).status_code == 422)
-
-                check("GET /notificaciones sin token da 401",
-                      cliente.get(f"{API}/notificaciones").status_code == 401)
-                check("GET /notificaciones/sin-leer sin token da 401",
-                      cliente.get(f"{API}/notificaciones/sin-leer").status_code == 401)
-
-                avisos_cos = cliente.get(f"{API}/notificaciones?limite=100", headers=H_COS)
-                check("El autor recibe aviso interno por el envío a revisión",
-                      avisos_cos.status_code == 200 and avisos_cos.json().get("total", 0) >= 1)
-
-                bitacora = cliente.get(f"{API}/admin/auditoria?limite=100", headers=H_ADMIN)
-                tipos = {fila["tipo_evento"] for fila in bitacora.json().get("elementos", [])} \
-                    if bitacora.status_code == 200 else set()
-                check("GET /admin/auditoria con admin da 200", bitacora.status_code == 200)
-                check("La bitácora registra contenido_enviado_revision",
-                      "contenido_enviado_revision" in tipos)
-                check("La bitácora registra el correo a moderación",
-                      any(fila["categoria"] == "correo_moderacion"
-                          for fila in bitacora.json().get("elementos", [])),
-                      )
-
-                # --- 6. Observer: crear evento y avisar --------------------
-                evento = cliente.post(
-                    f"{API}/admin/eventos",
-                    json={
-                        "nombre": "Convención de prueba ES3",
-                        "tipo": "convencion",
-                        "fecha_inicio": "2026-12-01T10:00:00Z",
-                        "lugar": "Santiago",
-                        "region": "Metropolitana",
-                    },
-                    headers=H_ADMIN,
-                )
-                check("POST /admin/eventos crea el evento (201)", evento.status_code == 201,
-                      str(evento.status_code))
-
-                sin_leer = cliente.get(f"{API}/notificaciones/sin-leer", headers=H_COS)
-                check("Crear evento genera avisos a la comunidad",
-                      sin_leer.status_code == 200 and sin_leer.json().get("sin_leer", 0) >= 2,
-                      f"sin_leer={sin_leer.json().get('sin_leer')}")
-
-                bitacora2 = cliente.get(f"{API}/admin/auditoria?limite=100", headers=H_ADMIN)
-                check("La bitácora registra evento_creado",
-                      any(fila["tipo_evento"] == "evento_creado"
-                          for fila in bitacora2.json().get("elementos", [])))
-
-                pendientes = cliente.get(
-                    f"{API}/notificaciones?solo_no_leidas=true&limite=100", headers=H_COS
-                )
-                primer = pendientes.json().get("elementos", [{}])[0].get("id_notificacion")
-                marcada = cliente.patch(
-                    f"{API}/notificaciones/{primer}/leer", headers=H_COS
-                )
-                check("PATCH /notificaciones/{id}/leer marca como leída",
-                      marcada.status_code == 200 and marcada.json().get("leida") is True)
-
-                # --- 7. Bandeja editorial ----------------------------------
-                id_contenido = creado.json().get("id_contenido") if creado.status_code == 201 else None
-                if id_contenido:
-                    publicado = cliente.post(
-                        f"{API}/admin/contenido/{id_contenido}/publicar", headers=H_ADMIN
-                    )
-                    check("Publicar el borrador desde el panel da 200",
-                          publicado.status_code == 200 and publicado.json().get("estado") == "publicado")
-                else:
-                    check("Publicar el borrador desde el panel da 200", False)
-
-                tema = cliente.post(
-                    f"{API}/foro/temas",
-                    json={"titulo": "Tema del recorrido ES3",
-                          "categoria": "Eventos y comunidad",
-                          "contenido": "Mensaje de prueba del recorrido HTTP."},
-                    headers=H_COS,
-                )
-                check("POST /foro/temas con sesión crea el tema",
-                      tema.status_code in (200, 201), str(tema.status_code))
-        finally:
-            proceso.terminate()
-            try:
-                proceso.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proceso.kill()
-
-    total = len(resultados)
-    fallos = [nombre for ok, nombre, _ in resultados if not ok]
-    print("\n" + "=" * 62)
-    print(f"RESULTADO: {total - len(fallos)}/{total} comprobaciones en verde")
-    if fallos:
-        print("Fallos:")
-        for nombre in fallos:
-            print(f"  - {nombre}")
-        return 1
-    return 0
+    fallos = [n for n, ok in RESULTADOS if not ok]
+    print(f"\nRESULTADO: {len(RESULTADOS) - len(fallos)}/{len(RESULTADOS)} comprobaciones en verde")
+    return 1 if fallos else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    preparar_base()
+    raise SystemExit(asyncio.run(main()))

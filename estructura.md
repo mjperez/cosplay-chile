@@ -1,292 +1,121 @@
 # Estructura de paquetes
 
-Árbol real del repositorio al cierre del proyecto, con la responsabilidad de
-cada módulo y la regla de dependencia que lo mantiene ordenado.
+Árbol real del repositorio tras integrar el diseño y su backend, con la responsabilidad de cada módulo y la regla de dependencia que lo mantiene ordenado.
 
 ## Árbol
 
-```
+```text
 cosplay-chile/
-├── .gitattributes
+├── .github/workflows/ci.yml       pytest + cobertura ≥90% y Vitest + build
+├── .env.example                   variables de entorno (sin secretos)
 ├── .gitignore
-├── .github/workflows/ci.yml    pipeline CI: pytest+cobertura, lint, build
-├── README.md                  puesta en marcha, API, patrones, despliegue y trazabilidad
-├── CORRECCIONES_ES3.md        evidencia de correcciones (rúbrica 3.1.5)
-├── GUIA_DEMO.md               guion para exponer la plataforma en clases
-├── estructura.md              este archivo
-├── render.yaml                dos servicios: API + sitio estático
+├── README.md                      puesta en marcha, API, pruebas, decisiones y normativa
+├── GUIA_DEMO.md                   guion para exponer la plataforma en clases
+├── CORRECCIONES_ES3.md            criterio 3.1.5: 9 hallazgos con evidencia
+├── estructura.md                  este archivo
+├── docker-compose.yml             API + web + PostgreSQL
+├── render.yaml                    despliegue de API y sitio estático
+├── presentacion_3.docx            presentación de la Unidad 3
+├── design/
+│   └── Cosplay Chile — Frontend.html   diseño exportado (8 tableros, sin modificar)
+├── docs/
+│   ├── informe_requerimientos.pdf RF-01…RF-40 y RNF-01…RNF-11
+│   ├── DECISIONES.md              decisiones técnicas y decisiones de diseño
+│   ├── TRAZABILIDAD.md            estado de cada requerimiento
+│   └── BRECHAS_DISENO.md          diferencias entre el diseño y la API
 ├── backend/
 │   ├── .env.example
 │   ├── alembic.ini
-│   ├── pytest.ini
-│   ├── requirements.txt       solo ejecución
-│   ├── requirements-dev.txt   añade pytest, httpx y pytest-cov
+│   ├── pyproject.toml             pytest async + coverage con núcleo sysmon
+│   ├── requirements.txt
+│   ├── requirements-dev.txt       pytest, pytest-asyncio, httpx, pytest-cov
+│   ├── alembic/
+│   │   ├── env.py                 migraciones asíncronas
+│   │   └── versions/0001_esquema_inicial.py
+│   ├── app/
+│   │   ├── main.py                compone routers, CORS, cabeceras y /media
+│   │   ├── api/routers/           15 routers: auth, perfil, meta, archivos, contacto,
+│   │   │                          contenidos, favoritos, notificaciones, moderación,
+│   │   │                          directorio, eventos, reportes, comunidad, inicio, búsqueda
+│   │   ├── core/                  configuración, deps (JWT/roles), seguridad argon2
+│   │   ├── db/                    session_manager.py ← Singleton; base.py
+│   │   ├── models/                entidades SQLAlchemy (tabla única para Contenido y DirectorioItem)
+│   │   ├── patterns/
+│   │   │   ├── contenido_factory.py      ← Factory Method
+│   │   │   ├── observer/                 ← GestorEventos + 3 observadores
+│   │   │   └── storage/                  ← Adapter local / Cloudinary
+│   │   ├── schemas/               contratos Pydantic (pagina {items,total,pagina,paginas})
+│   │   ├── services/              lógica de negocio por módulo
+│   │   └── seed/                  datos demo + ilustraciones SVG propias
 │   ├── scripts/
-│   │   └── recorrido_http.py  smoke real sobre uvicorn (51 comprobaciones)
-│   └── app/
-│       ├── __init__.py
-│       ├── main.py            fábrica de la aplicación FastAPI
-│       ├── api/
-│       │   ├── __init__.py
-│       │   ├── deps.py        sesión, usuario actual y control de roles
-│       │   └── routes/
-│       │       ├── health.py       GET /health
-│       │       ├── auth.py         registro, login, /me y /privacidad
-│       │       ├── admin.py        panel: métricas, editorial, eventos, foro, desafíos, comunidad
-│       │       ├── proveedores.py  US-13 directorio
-│       │       ├── contenido.py    US-08 contenido editorial
-│       │       ├── eventos.py      calendario y participaciones
-│       │       ├── comunidad.py    foro y desafíos mensuales
-│       │       ├── perfiles.py     perfil público de cosplayer
-│       │       ├── directorio.py   tiendas y grupos
-│       │       ├── notificaciones.py  avisos internos y contador sin leer
-│       │       └── archivos.py       subida y borrado de imágenes (Adapter)
-│       ├── core/
-│       │   ├── config.py       Settings desde variables de entorno
-│       │   ├── database.py     DatabaseSessionManager (Singleton) y get_db
-│       │   ├── security.py     bcrypt y JWT
-│       │   └── privacidad.py   texto y versión de la política
-│       ├── models/
-│       │   ├── base.py         Base declarativa y marcas de tiempo
-│       │   ├── usuario.py      Usuario, PerfilCosplayer
-│       │   ├── contenido.py    Contenido y sus tres subtipos
-│       │   ├── evento.py       EventoCosplay, ParticipacionEvento
-│       │   ├── directorio.py   Proveedor, DondeComprar, ComunidadGrupo
-│       │   ├── comunidad.py    ForoTema, ForoRespuesta, DesafioMensual
-│       │   ├── notificacion.py Notificacion y BitacoraAuditoria (sin FK a usuario)
-│       │   └── intento_login.py contador para el bloqueo por fuerza bruta
-│       ├── events/
-│       │   ├── gestor.py       GestorEventos (Observer) y catálogo cerrado de 4 eventos
-│       │   └── observadores.py NotificacionInterna, CorreoModerador, RegistroAuditoria
-│       ├── adapters/
-│       │   └── almacenamiento.py  IAlmacenamientoArchivos + Local + Cloudinary
-│       ├── repositories/
-│       │   ├── usuario.py      consultas de usuarios
-│       │   ├── intento_login.py consultas de intentos
-│       │   ├── proveedor.py    consultas del directorio
-│       │   ├── contenido.py    consultas editoriales
-│       │   ├── evento.py       eventos y participaciones
-│       │   ├── comunidad.py    temas, respuestas y desafíos
-│       │   ├── perfil.py       alta y actualización del perfil
-│       │   ├── directorio.py   tiendas y grupos
-│       │   ├── notificacion.py avisos y bitácora de auditoría
-│       │   └── admin.py        conteos y temas ocultos (solo panel)
-│       ├── schemas/
-│       │   ├── auth.py         entrada y salida de autenticación
-│       │   ├── proveedor.py    fichas del directorio
-│       │   ├── contenido.py    guías, entrevistas y artículos
-│       │   ├── evento.py       eventos y participaciones
-│       │   ├── comunidad.py    foro y desafíos
-│       │   ├── perfil.py       perfil público
-│       │   ├── directorio.py   tiendas y grupos
-│       │   ├── archivo.py      respuesta de la subida de imágenes
-│       │   ├── notificacion.py avisos, resumen y registros de auditoría
-│       │   └── admin.py        resumen y entradas del panel
-│       ├── services/
-│       │   ├── auth.py         registro, login y política de bloqueo
-│       │   ├── proveedor.py    reglas del directorio
-│       │   ├── contenido.py    ciclo editorial
-│       │   ├── evento.py       inscripciones y reglas del calendario
-│       │   ├── comunidad.py    reglas del foro y de los desafíos
-│       │   ├── perfil.py       reglas del perfil público
-│       │   ├── archivos.py     whitelist, magic bytes, tamaño e identificador
-│       │   └── admin.py        transiciones editoriales, moderación y altas
-│       ├── factories/
-│       │   └── contenido_factory.py  crea el subtipo correcto de Contenido
-│       └── seed/
-│           ├── proveedores.py  20 fichas reales del directorio
-│           ├── categorias.py   5 categorías de contenido
-│           ├── datos_base.py   orquestador idempotente para producción
-│           └── demo.py         cuentas por rol y contenido para clases
-│   ├── migrations/
-│   │   ├── env.py
-│   │   ├── script.py.mako
-│   │   └── versions/
-│   │       ├── 0001_esquema_inicial.py
-│   │       ├── 0002_intentos_login.py
-│   │       ├── 0003_proveedor_region_opcional.py
-│   │       ├── 0004_contenido_enriquecido.py
-│   │       └── 0005_observer_notificaciones_auditoria.py  aditiva: 2 tablas
-│   ├── tests/
-│   │   ├── conftest.py               esquema por Alembic y limpieza por prueba
-│   │   ├── casos_por_rf.md           matriz de casos por requerimiento (EV4)
-│   │   ├── test_config.py
-│   │   ├── test_singleton.py
-│   │   ├── test_health.py
-│   │   ├── test_migraciones.py
-│   │   ├── test_seguridad.py
-│   │   ├── test_registro.py
-│   │   ├── test_login.py
-│   │   ├── test_autorizacion.py
-│   │   ├── test_proveedores.py
-│   │   ├── test_contenido.py
-│   │   ├── test_modulos_nuevos.py    eventos, foro, desafíos, perfiles, catálogos
-│   │   ├── test_panel_admin.py       permisos, resumen, editorial, moderación y altas
-│   │   ├── test_observer.py          13 pruebas: 3 observadores, 4 eventos, bitácora
-│   │   ├── test_adapter.py           18 pruebas: interfaz, disco, nube, whitelist, HTTP
-│   │   └── test_semilla_demo.py      idempotencia, nombres por rol, bloqueo en prod.
-│   └── exp/                          apuntes de exploración, no es código del producto
+│   │   ├── dev.ps1                arranque local en Windows
+│   │   └── recorrido_http.py      recorrido reproducible: 40/40 comprobaciones
+│   └── tests/
+│       ├── conftest.py            base de test, Alembic y limpieza por prueba
+│       ├── casos_por_rf.md        matriz RF ↔ prueba (96 casos)
+│       ├── test_auth.py           20 · registro/login/recuperación
+│       ├── test_contenidos.py     11 · contents y descarga
+│       ├── test_directorio_calendario.py  11 · directorio, mapa y eventos
+│       ├── test_factory.py        13 · Factory Method
+│       ├── test_comunidad_moderacion.py    8 · foros, desafíos y moderación
+│       ├── test_busqueda_inicio.py 6 · portada y búsqueda
+│       ├── test_observer.py       7 · Observer y bitácora
+│       ├── test_patrones_base.py  8 · Singleton y Adapter
+│       ├── test_cobertura_extra.py 7 · semillas y flujos adicionales
+│       └── test_cobertura_final.py 5 · entrypoint, moderación, avisos y búsqueda
 └── frontend/
-    ├── index.html                    documento raíz, lang="es-CL"
-    ├── vite.config.ts                Tailwind y proxy hacia el backend
-    ├── .env.example
+    ├── package.json / package-lock.json   React 19, Tailwind 4, Leaflet, Vitest
+    ├── vite.config.js             proxy /api y /media en desarrollo
+    ├── public/
     └── src/
-        ├── main.tsx                  monta React, el router y el proveedor de sesión
-        ├── App.tsx                   tabla de rutas (18 páginas)
-        ├── index.css                 tokens del sistema de diseño (@theme)
-        ├── lib/
-        │   ├── api.ts                cliente HTTP y tipos del backend
-        │   ├── auth.tsx              ProveedorAuth (solo el componente)
-        │   ├── contextoAuth.ts       contexto y hook useAuth
-        │   ├── contenido.ts          etiquetas y tonos del contenido
-        │   ├── etiquetas.ts          etiquetas del directorio
-        │   ├── modulos.ts            cliente y tipos de los seis módulos nuevos
-        │   ├── notificaciones.ts     avisos internos y contador sin leer
-        │   ├── archivos.ts           subida multipart (FormData) y borrado
-        │   └── admin.ts              cliente, bitácora y tipos del panel
+        ├── api/client.js           cliente REST y traducción de errores
+        ├── App.jsx                 tabla de rutas (23 rutas, diseño aplicado)
+        ├── assets/diseno/          ilustraciones del diseño (JPG propios)
         ├── components/
-        │   ├── ui/                   Boton, Campo, Tarjeta, Etiqueta
-        │   ├── layout/               Disposicion, Encabezado, Pie
-        │   ├── home/                 Portada, Modulos, Pasos
-        │   └── directorio/           PanelFiltros, TarjetaProveedor
-        └── pages/
-            ├── InicioPagina.tsx
-            ├── DirectorioPagina.tsx
-            ├── ContenidoPagina.tsx
-            ├── ContenidoDetallePagina.tsx
-            ├── EditorContenidoPagina.tsx
-            ├── EventosPagina.tsx
-            ├── EventoDetallePagina.tsx
-            ├── ForoPagina.tsx
-            ├── TemaDetallePagina.tsx
-            ├── DesafiosPagina.tsx
-            ├── ComunidadPagina.tsx
-            ├── PerfilPagina.tsx
-            ├── NotificacionesPagina.tsx  bandeja de avisos con "marcar leída"
-            ├── AdminPagina.tsx       panel por pestañas + Auditoría, solo administrador
-            ├── RegistroPagina.tsx
-            ├── IngresarPagina.tsx
-            ├── PrivacidadPagina.tsx
-            └── NoEncontradaPagina.tsx
+        │   ├── diseno/             Icono, Logo, Pestanas, Acordeon, Insignias
+        │   ├── Layout.jsx          cabecera, pie, menú móvil y navegación
+        │   ├── CampanaNotificaciones.jsx  avisos internos (RF-37)
+        │   ├── BuscadorGlobal.jsx  autocompletado (RF-31)
+        │   ├── SubirImagen.jsx     Adapter + texto alternativo obligatorio
+        │   └── useApi.js, useFavoritos.js, Protegida.jsx
+        ├── contexto/               AuthContext y MetaContext
+        ├── pages/                  inicio, guías, directorio, calendario, comunidad,
+        │                           desafíos, perfil, favoritos, búsqueda, seguridad,
+        │                           contacto/privacidad y moderación
+        ├── index.css               tokens de diseño, tipografías y componentes
+        └── test/                   8 archivos · 59 pruebas de interfaz
 ```
 
-Los tokens viven en `src/index.css`, en el bloque `@theme` de Tailwind 4. Un
-componente no escribe colores hexadecimales sueltos: si hace falta un color
-nuevo, se declara ahí y se usa por nombre (por ejemplo `--color-exito-100`).
+## Responsabilidades por capa
 
-## Responsabilidad de cada capa
-
-| Capa | Qué hace | Qué no hace |
+| Capa | Hace | No hace |
 |---|---|---|
-| `app/core` | configuración, motor de base de datos, criptografía | no conoce reglas de negocio ni rutas |
-| `app/models` | mapeo objeto-relacional y restricciones | no valida datos de entrada |
-| `app/schemas` | validación y forma de los datos que entran y salen | no consulta la base |
-| `app/repositories` | consultas SQL, una función por caso de uso | no decide reglas ni códigos HTTP |
-| `app/services` | reglas de negocio y transacciones | no conoce HTTP ni serializa |
-| `app/api/routes` | contrato HTTP: rutas, códigos, dependencias | no escribe SQL ni decide reglas |
-| `app/factories` | construye la entidad correcta según el tipo | no valida ni persiste |
-| `app/events` | sujeto observable, catálogo de eventos y observadores | no decide cuándo ocurre el evento de negocio |
-| `app/adapters` | traduce la interfaz de almacenamiento al proveedor concreto | no conoce endpoints ni reglas editoriales |
-| `app/seed` | carga datos iniciales de forma idempotente | no define reglas de negocio |
-| `migrations` | evolución del esquema | no crea datos de negocio |
-| `tests` | verifica criterios de aceptación | no depende de servicios externos |
+| `models` | Define entidades y reglas de integridad de la base | No valida HTTP |
+| `schemas` | Valida entradas y da forma a las salidas | No accede a la base |
+| `repositories` / `services` | Consultas y lógica de negocio | No conocen FastAPI |
+| `api/routers` | HTTP, permisos y códigos de estado | No contiene reglas de negocio |
+| `patterns` | Singleton, Factory, Observer y Adapter transversales | No sustituyen a un servicio |
+| `main.py` | Compone la aplicación | No contiene lógica de negocio |
+| `frontend/src/api` | Comunicación con `/api` y errores en español | No decide diseño |
+| `frontend/src/pages` | Pantallas del diseño | No implementan reglas de negocio |
 
-## Regla de dependencia
+## Dependencias entre capas
 
-```
-routes ──▶ services ──▶ repositories ──▶ models ──▶ base
-   │            │
-   └────────────┴────▶ core ──▶ config
-```
-
-La flecha significa «puede importar». Se cumple en un solo sentido:
-
-- `models` no importa nada de `api`, `services` ni `repositories`.
-- `repositories` no importa nada de `services` ni de `api`.
-- `services` no importa nada de `api`, pero sí puede emitir hacia `app/events`.
-- `app/events` y `app/adapters` son transversales: los observadores reciben la
-  `Session` del servicio y hablan con `repositories`; el adaptador se inyecta
-  desde `api/deps.py` y nunca es importado directamente por una ruta.
+- `models` no importa nada de `schemas`, `services` ni `api`.
+- `schemas` puede importar `models` para aliases y enums.
+- `services` no importa nada de `api`.
 - `api` puede importar todo lo anterior.
-- `main.py` solo compone: no contiene lógica (registra routers, monta
-  `/archivos` y llama a `configurar_observadores()` en el `lifespan`).
+- `main.py` solo compone.
 
-Si aparece un import que va contra la flecha, la solución no es moverlo: es
-crear la capa que falta, no romper el orden.
+## Estado de la entrega
 
-## Por qué existe cada capa nueva
-
-Las capas `schemas`, `services` y `repositories` no existían al cierre del
-Sprint 1. Se crearon en US-04a porque el registro y el login tienen tres
-responsabilidades que no pueden convivir en un endpoint:
-
-1. **Validar** el cuerpo de la petición (Pydantic, `schemas`).
-2. **Decidir** cuándo una credencial es válida y cuándo hay que bloquear
-   (`services`).
-3. **Consultar** la base sin mezclar SQL con reglas (`repositories`).
-
-Los módulos de comunidad posteriores reutilizaron exactamente el mismo corte
-vertical: un esquema, un repositorio, un servicio y un router por dominio. Por
-eso las tablas que ya estaban en `0001_esquema_inicial.py` (eventos, foro,
-desafíos, perfil, tiendas, grupos) pudieron activarse sin tocar el esquema ni
-añadir una migración nueva.
-
-El panel siguió el mismo corte (`schemas/admin.py`, `repositories/admin.py`,
-`services/admin.py`, `routes/admin.py`) con una salvedad de seguridad: su
-repositorio es **aparte** del público. La bandeja editorial necesita ver
-borradores y temas ocultos, mientras que `repositories/contenido.py` y
-`repositories/comunidad.py` los filtran a propósito. Poner una bandera
-`incluir_ocultos` en esos repositorios dejaría un interruptor olvidable en
-código que también sirve a visitantes anónimos.
-
-## Estado de las historias
-
-| Historia | Estado | Archivos |
+| Entregable | Estado | Evidencia |
 |---|---|---|
-| US-01 infraestructura | ✅ | `app/core/`, `migrations/`, `render.yaml` |
-| US-04a registro, login, roles, hash y JWT | ✅ | `app/api/routes/auth.py`, `app/services/auth.py` |
-| US-02 landing y navegación | ✅ | `frontend/src/App.tsx`, `components/layout/`, `components/home/` |
-| US-13 directorio | ✅ | `app/api/routes/proveedores.py`, `frontend/src/pages/DirectorioPagina.tsx` |
-| US-08 contenido editorial | ✅ | `app/api/routes/contenido.py`, `app/factories/contenido_factory.py` |
-| Calendario de eventos | ✅ | `app/api/routes/eventos.py`, `frontend/src/pages/EventosPagina.tsx` |
-| Foro y desafíos | ✅ | `app/api/routes/comunidad.py`, `frontend/src/pages/ForoPagina.tsx` |
-| Perfil y complementos del directorio | ✅ | `app/api/routes/{perfiles,directorio}.py` |
-| Panel de administración | ✅ | `app/api/routes/admin.py`, `app/services/admin.py`, `frontend/src/pages/AdminPagina.tsx` |
-| **ES3 · Observer: avisos, correo y auditoría (RF-37)** | ✅ | `app/events/`, `app/models/notificacion.py`, `routes/notificaciones.py`, `frontend/src/pages/NotificacionesPagina.tsx` |
-| **ES3 · Adapter: imágenes (RF-18/RF-27)** | ✅ | `app/adapters/`, `app/services/archivos.py`, `routes/archivos.py`, `frontend/src/lib/archivos.ts` |
-| **ES3 · CI/CD, entornos y evidencia 3.1.5** | ✅ | `.github/workflows/ci.yml`, `render.yaml`, `CORRECCIONES_ES3.md`, `scripts/recorrido_http.py` |
-| EV4 pruebas funcionales y trazabilidad | ✅ | `tests/test_modulos_nuevos.py`, `tests/test_panel_admin.py`, `tests/test_semilla_demo.py`, `tests/test_observer.py`, `tests/test_adapter.py`, `tests/casos_por_rf.md` |
-
-**169 pruebas** en verde, **96% de cobertura**, **49 rutas** en OpenAPI y
-**51/51 comprobaciones** en el recorrido HTTP real. Los cuatro patrones
-comprometidos en el ES2 (Singleton, Factory Method, Observer, Adapter) están
-implementados y se verifican juntos en
-`test_los_cuatro_patrones_del_informe_estan_implementados`.
-
-## Correspondencia con la vista de desarrollo
-
-| Paquete | Componente del diagrama |
-|---|---|
-| `app/api` | API REST |
-| `app/core` | Gestor de configuración y acceso a datos |
-| `app/models` | Modelo de dominio |
-| `migrations` | Esquema de base de datos |
-| `app/seed` | Carga inicial de datos |
-| `app/events` | Publicación/suscripción de eventos de dominio |
-| `app/adapters` | Servicio externo de almacenamiento |
-| `frontend/src` | Cliente React + Tailwind |
-
-## Convenciones
-
-- Nombres de tablas y columnas en singular y `snake_case`.
-- Identificadores primarios con prefijo del dominio: `id_usuario`, `id_evento`.
-- Claves foráneas con el mismo nombre que la columna referenciada.
-- Enumeraciones declaradas como constante en el módulo del modelo y aplicadas
-  en la columna con `Enum(..., native_enum=False)`.
-- Validación de entrada en `schemas` con Pydantic, no en los modelos.
-- Una función por consulta en `repositories`; nada de SQL en los endpoints.
-- Las excepciones de dominio se declaran en `services` y se traducen a códigos
-  HTTP en `routes`.
-- Las rutas literales se registran antes que las que capturan un UUID.
-- Los listados devuelven `total` y `elementos`; los paginados añaden `limite` y
-  `desplazamiento`.
+| Diseño aplicado sin cambios | ✅ | `design/`, `frontend/src/components/diseno/`, 59 pruebas de interfaz |
+| Prototipo funcional (35%) | ✅ | 60 rutas, 40/40 recorrido HTTP, 96 pruebas, 97% cobertura |
+| Cuatro patrones del ES2 | ✅ | Factory, Observer, Adapter y Singleton con pruebas dedicadas |
+| Criterios 3.1.1 y 3.1.2 | ✅ | README: SaaS/IaaS/Cloud, ética ACM/IEEE, Ley 19.223 y 21.719 |
+| Criterio 3.1.5 | ✅ | `CORRECCIONES_ES3.md` con 9 hallazgos y evidencia |
+| CI/CD y entornos | ✅ | `.github/workflows/ci.yml`, Render, local/test/production |
+| Diagramas UML adaptativos e informe de testeo (ES4) | ⏳ | Aparcado a petición del usuario |
+| OWASP ZAP y prueba de carga | ⏳ | Brechas documentadas en `backend/tests/casos_por_rf.md` |

@@ -1,32 +1,202 @@
-"""Datos base que deben existir en cualquier despliegue.
+"""Datos semilla de la Fase 1: categorías, usuarios demo, directorio y eventos.
 
-Son datos reales del levantamiento de requerimientos (categorías y fichas del
-directorio), no datos de demostración. Los dos cargadores son idempotentes, así
-que se puede ejecutar en cada arranque sin duplicar ni sobreescribir cambios
-hechos a mano.
-
-    python -m app.seed.datos_base
+Todos los negocios, comunidades y eventos son FICTICIOS (dominios .example).
 """
+from app.models.enums import EstadoUsuario, Rol
 
-from __future__ import annotations
+CLAVE_DEMO = "Cosplay2026!"
+CLAVE_ADMIN = "Admin2026!"
 
-from app.core.database import get_session_manager
-from app.seed import categorias, proveedores
+CATEGORIAS = [
+    ("eleccion-personaje", "Elección de personaje", "Cómo elegir un personaje acorde a tu tiempo, presupuesto y gustos."),
+    ("medidas", "Toma de medidas", "Medidas corporales y patrones para trajes que calcen en todos los cuerpos."),
+    ("confeccion", "Confección y patronaje", "Costura, patronaje, telas y técnicas de confección."),
+    ("props-armaduras", "Props y armaduras", "Goma EVA, termoplásticos, impresión 3D y pintura de props."),
+    ("maquillaje-pelucas", "Maquillaje y pelucas", "Maquillaje de caracterización, FX y estilizado de pelucas."),
+    ("fotografia", "Fotografía", "Sesiones de fotos, poses y trabajo con fotógrafos."),
+    ("escenificacion", "Escenificación y concursos", "Pasarela, performance y preparación para concursos."),
+    ("consejos-expertos", "Consejos de expertos", "Recomendaciones de cosplayers y jurados con experiencia (RF-21)."),
+    ("presupuesto", "Presupuesto", "Planificar gastos en pesos chilenos y conseguir materiales baratos."),
+    ("seguridad-eventos", "Seguridad en eventos", "Prevención de acoso, transporte y cuidado de la salud (RF-39)."),
+    ("errores-comunes", "Errores comunes", "Errores frecuentes en confección y estilizado, y cómo evitarlos (RF-28)."),
+    ("historias", "Historias de cosplayers", "Experiencias de la comunidad chilena: inclusión y diversidad (RF-26)."),
+]
+
+# (clave interna, nombre, email, rol, estado, tipo_perfil, region, perfil_publico, biografía)
+USUARIOS = [
+    ("admin", "Equipo de Moderación", "admin@cosplaychile.cl", Rol.ADMIN, EstadoUsuario.ACTIVO, "ORGANIZADOR", "RM",
+     False, "Cuenta del equipo que modera Cosplay Chile."),
+    ("camila", "Camila Rojas", "camila@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "COSPLAYER", "RM", False,
+     "Cosplayer hace 3 años. Me encantan los personajes de fantasía y las armaduras de EVA."),
+    ("joaquin", "Joaquín Huenchumán", "joaquin@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "COSMAKER", "BI", True,
+     "Cosmaker en Concepción. Trajes por encargo con patrones adaptados a cada cuerpo."),
+    ("tienda", "Telas del Puerto", "tienda@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "TIENDA", "VA", True,
+     "Tienda de telas y accesorios en Valparaíso con despacho a todo Chile."),
+    ("organiza", "Daniela Araya", "organiza@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "ORGANIZADOR", "CO", False,
+     "Organizo meetups y talleres de cosplay en La Serena."),
+    ("suspendido", "Cuenta Suspendida", "suspendido@demo.cl", Rol.USUARIO, EstadoUsuario.SUSPENDIDO, "COSPLAYER",
+     "VA", False, "Cuenta de demostración suspendida por moderación."),
+    # Autoras y autores de contenido y foro
+    ("valentina", "Valentina Quispe", "valentina@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "COSPLAYER", "AP", False,
+     "Cosplayer de Arica. Hago cosplay desde mi silla de ruedas y la integro a cada personaje."),
+    ("matias", "Matías Soto", "matias@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "MODELADOR", "RM", False,
+     "Modelador de props y armaduras. Doy talleres de goma EVA."),
+    ("antonia", "Antonia Millán", "antonia@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "MAQUILLADOR", "VA", False,
+     "Maquilladora de caracterización y efectos especiales."),
+    ("ignacia", "Ignacia Pérez", "ignacia@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "FOTOGRAFO", "MA", False,
+     "Fotógrafa en Punta Arenas. Me gustan las sesiones con paisajes australes."),
+    ("benja", "Benjamín Torres", "benja@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "COSPLAYER", "AN", False,
+     "Crossplayer y jurado en concursos del norte."),
+    ("rocio", "Rocío Catalán", "rocio@demo.cl", Rol.USUARIO, EstadoUsuario.ACTIVO, "COSPLAYER", "AR", False,
+     "Cosplay de talla grande con orgullo. Comparto patrones adaptados."),
+]
+
+# Coordenadas aproximadas de comunas (para el mapa, RF-12)
+C = {
+    "Arica": (-18.4783, -70.3126), "Iquique": (-20.2307, -70.1357), "Antofagasta": (-23.6509, -70.3975),
+    "La Serena": (-29.9045, -71.2489), "Valparaíso": (-33.0472, -71.6127), "Viña del Mar": (-33.0245, -71.5518),
+    "Santiago": (-33.4489, -70.6693), "Ñuñoa": (-33.4569, -70.5979), "Maipú": (-33.5110, -70.7580),
+    "Providencia": (-33.4314, -70.6093), "Peñalolén": (-33.4850, -70.5400), "Rancagua": (-34.1708, -70.7444),
+    "Talca": (-35.4264, -71.6554), "Chillán": (-36.6066, -72.1034), "Concepción": (-36.8201, -73.0444),
+    "Temuco": (-38.7359, -72.5904), "Valdivia": (-39.8142, -73.2459), "Puerto Montt": (-41.4689, -72.9411),
+    "Coyhaique": (-45.5712, -72.0685), "Punta Arenas": (-53.1638, -70.9171),
+}
 
 
-def cargar(sesion) -> dict[str, tuple[int, int]]:
-    return {
-        "categorias": categorias.cargar(sesion),
-        "proveedores": proveedores.cargar(sesion),
-    }
+def _coord(comuna: str, d: float = 0.0) -> tuple[float, float]:
+    lat, lng = C[comuna]
+    return round(lat + d, 5), round(lng + d, 5)
 
 
-def main() -> None:
-    with get_session_manager().session() as sesion:
-        resultado = cargar(sesion)
-    for nombre, (creados, existentes) in resultado.items():
-        print(f"{nombre}: creados={creados}, ya existian={existentes}")
+PROVEEDORES = [
+    dict(nombre="Taller Kintsugi Props", region="RM", comuna="Ñuñoa", esp=["MODELADO", "PINTURA"],
+         servicios=["Armaduras de goma EVA", "Props impresos en 3D", "Pintura y envejecido"],
+         precio=(25000, 350000), contacto="contacto@kintsugiprops.example", web="https://kintsugiprops.example",
+         desc="Taller de props y armaduras. Adaptamos piezas para personas con movilidad reducida.", img="taller"),
+    dict(nombre="Hilo Rojo Sastrería Cosplay", region="RM", comuna="Santiago", esp=["SASTRERIA", "COSMAKER"],
+         servicios=["Patronaje a medida", "Ajustes para todas las tallas", "Trajes adaptados a silla de ruedas"],
+         precio=(30000, 280000), contacto="+56 9 5555 0101", web="https://hilorojo.example",
+         desc="Sastrería especializada en cosplay. Medimos y patronamos para todos los cuerpos.", img="confeccion"),
+    dict(nombre="Pelucas Sakura Estudio", region="VA", comuna="Viña del Mar", esp=["PELUQUERIA"],
+         servicios=["Estilizado de pelucas", "Corte y fijación", "Pelucas con picos y volumen"],
+         precio=(15000, 90000), contacto="@pelucassakura.example", web=None,
+         desc="Estilizado de pelucas para cosplay con entrega en la V Región.", img="maquillaje"),
+    dict(nombre="Lente Austral Fotografía", region="MA", comuna="Punta Arenas", esp=["FOTOGRAFIA"],
+         servicios=["Sesiones en exteriores", "Edición profesional", "Cobertura de eventos"],
+         precio=(35000, 120000), contacto="hola@lenteaustral.example", web="https://lenteaustral.example",
+         desc="Sesiones cosplay con paisajes de la Patagonia.", img="fotografia"),
+    dict(nombre="Maquillaje FX Atacama", region="AN", comuna="Antofagasta", esp=["MAQUILLAJE"],
+         servicios=["Maquillaje de caracterización", "Prótesis de látex", "Talleres de FX"],
+         precio=(20000, 150000), contacto="+56 9 5555 0202", web=None,
+         desc="Maquillaje FX y caracterización para concursos.", img="maquillaje"),
+    dict(nombre="Forja Norte Props", region="AP", comuna="Arica", esp=["MODELADO"],
+         servicios=["Espadas y escudos livianos", "Moldes de silicona", "Resina"],
+         precio=(18000, 200000), contacto="forjanorte@correo.example", web=None,
+         desc="Props livianos y seguros para eventos.", img="armadura"),
+    dict(nombre="Costura Inclusiva Temuco", region="AR", comuna="Temuco", esp=["SASTRERIA", "COSMAKER"],
+         servicios=["Trajes de talla grande", "Cierres adaptados", "Arreglos express para eventos"],
+         precio=(20000, 220000), contacto="+56 9 5555 0303", web="https://costurainclusiva.example",
+         desc="Confección inclusiva: cierres magnéticos, telas sin costuras que roce y tallas reales.", img="confeccion"),
+    dict(nombre="Estudio Píxel Valdivia", region="LR", comuna="Valdivia", esp=["FOTOGRAFIA"],
+         servicios=["Estudio con fondos temáticos", "Fotografía de producto para cosmakers"],
+         precio=(30000, 90000), contacto="estudiopixel@correo.example", web=None,
+         desc="Estudio fotográfico con accesibilidad para silla de ruedas.", img="fotografia"),
+    dict(nombre="Tinta y Látex", region="CO", comuna="La Serena", esp=["MAQUILLAJE", "PINTURA"],
+         servicios=["Body paint", "Pintura de props", "Maquillaje para pasarela"],
+         precio=(15000, 110000), contacto="+56 9 5555 0404", web=None,
+         desc="Pintura corporal y de props en la Región de Coquimbo.", img="maquillaje"),
+    dict(nombre="Armería de Goma Maule", region="ML", comuna="Talca", esp=["MODELADO"],
+         servicios=["Armaduras completas", "Cascos", "Clases particulares de EVA"],
+         precio=(40000, 400000), contacto="armeriagoma@correo.example", web=None,
+         desc="Armaduras de goma EVA de alta densidad.", img="armadura"),
+    dict(nombre="Fotos en Ruta Iquique", region="TA", comuna="Iquique", esp=["FOTOGRAFIA"],
+         servicios=["Sesiones en la playa", "Fotografía nocturna"], precio=(25000, 80000),
+         contacto="@fotosenruta.example", web=None, desc="Sesiones al aire libre en Iquique.", img="fotografia"),
+    dict(nombre="Patrones del Sur", region="LL", comuna="Puerto Montt", esp=["SASTRERIA"],
+         servicios=["Patrones digitales", "Asesoría de telas", "Confección por encargo"],
+         precio=(12000, 180000), contacto="patronesdelsur@correo.example", web="https://patronesdelsur.example",
+         desc="Patrones de cosplay en tallas XS a 5XL.", img="confeccion"),
+    dict(nombre="Peinados y Pelucas Rancagua", region="LI", comuna="Rancagua", esp=["PELUQUERIA"],
+         servicios=["Estilizado", "Lavado y mantención de pelucas"], precio=(10000, 60000),
+         contacto="+56 9 5555 0505", web=None, desc="Mantención y estilizado de pelucas.", img="maquillaje"),
+]
 
+TIENDAS = [
+    dict(nombre="EVA Center Chile", region="RM", comuna="Maipú", tipos=["TERMOPLASTICOS", "PINTURAS"],
+         alcance="NACIONAL", fisica=True, contacto="ventas@evacenter.example", web="https://evacenter.example",
+         desc="Goma EVA de alta densidad, foam clay, termoplásticos y pinturas. Envíos a todo Chile."),
+    dict(nombre="Mercería Los Andes", region="RM", comuna="Santiago", tipos=["TELAS", "ACCESORIOS"],
+         alcance="NACIONAL", fisica=True, contacto="+56 2 2555 0606", web=None,
+         desc="Telas, cierres, botones y entretelas a precios de mayorista."),
+    dict(nombre="Lentes Fantasía CL", region="RM", comuna=None, tipos=["LENTES_CONTACTO"],
+         alcance="NACIONAL", fisica=False, contacto="hola@lentesfantasia.example", web="https://lentesfantasia.example",
+         desc="Lentes de contacto de fantasía con registro sanitario. Exigen receta de especialista."),
+    dict(nombre="Pinturas Biobío", region="BI", comuna="Concepción", tipos=["PINTURAS"],
+         alcance="NACIONAL", fisica=True, contacto="+56 41 255 0707", web=None,
+         desc="Pinturas acrílicas, imprimantes y barnices para props."),
+    dict(nombre="ThermoCraft Global", region=None, comuna=None, tipos=["TERMOPLASTICOS"],
+         alcance="INTERNACIONAL", fisica=False, contacto="support@thermocraft.example",
+         web="https://thermocraft.example", desc="Termoplásticos importados con envío internacional a Chile."),
+    dict(nombre="Wig Harbor International", region=None, comuna=None, tipos=["PELUCAS"],
+         alcance="INTERNACIONAL", fisica=False, contacto="help@wigharbor.example", web="https://wigharbor.example",
+         desc="Pelucas resistentes al calor con envío a Chile."),
+    dict(nombre="Insumos Norte Grande", region="AN", comuna="Antofagasta", tipos=["TERMOPLASTICOS", "PINTURAS", "ACCESORIOS"],
+         alcance="NACIONAL", fisica=True, contacto="+56 55 255 0808", web=None,
+         desc="Insumos para cosplay en el norte: EVA, pinturas, ojales y velcro."),
+    dict(nombre="Cosplay Supplies Patagonia", region="MA", comuna="Punta Arenas", tipos=["TELAS", "ACCESORIOS"],
+         alcance="NACIONAL", fisica=True, contacto="patagonia@supplies.example", web=None,
+         desc="Telas térmicas y accesorios para cosplay en clima frío."),
+]
 
-if __name__ == "__main__":
-    main()
+COMUNIDADES = [
+    dict(nombre="Cosplay Biobío", region="BI", comuna="Concepción", plataforma="Discord",
+         web="https://discord.example/cosplaybiobio", desc="Comunidad de Concepción y alrededores. Meetups mensuales en la Plaza de la Independencia."),
+    dict(nombre="Cosplayers de Valpo", region="VA", comuna="Valparaíso", plataforma="Instagram",
+         web="https://instagram.example/cosplayersvalpo", desc="Sesiones de fotos en los cerros de Valparaíso."),
+    dict(nombre="Comunidad Cosplay Norte", region="AN", comuna="Antofagasta", plataforma="WhatsApp",
+         web=None, desc="Grupo del norte grande para coordinar viajes a eventos."),
+    dict(nombre="Cosplay Austral Magallanes", region="MA", comuna="Punta Arenas", plataforma="Facebook",
+         web="https://facebook.example/cosplayaustral", desc="La comunidad más austral de Chile."),
+    dict(nombre="Crossplay y Diversidad Chile", region="RM", comuna="Providencia", plataforma="Discord",
+         web="https://discord.example/crossplaychile", desc="Espacio seguro para crossplay y cosplayers LGBTIQ+."),
+    dict(nombre="Cosplay Adaptativo Chile", region="RM", comuna="Peñalolén", plataforma="Instagram",
+         web="https://instagram.example/cosplayadaptativo",
+         desc="Cosplay en silla de ruedas, con prótesis y otras ayudas técnicas. Compartimos adaptaciones."),
+    dict(nombre="La Serena Geek Meetups", region="CO", comuna="La Serena", plataforma="WhatsApp",
+         web=None, desc="Meetups de cosplay y talleres en la Región de Coquimbo."),
+    dict(nombre="Araucanía Cosplay", region="AR", comuna="Temuco", plataforma="Instagram",
+         web="https://instagram.example/araucaniacosplay", desc="Cosplayers de Temuco, Villarrica y Angol."),
+]
+
+# (días desde hoy, duración en días, nombre, tipo, región, comuna, lugar, descripción, estado, imagen)
+EVENTOS = [
+    (13, 2, "Convención Andina de Cultura Pop", "CONVENCION", "RM", "Peñalolén", "Centro Cultural de Peñalolén",
+     "Dos días de concursos, artistas invitados y feria de cosmakers. Recinto accesible.", "PUBLICADO", "evento"),
+    (27, 1, "Concurso Nacional de Cosplay: clasificatoria sur", "CONCURSO", "BI", "Concepción", "Teatro Universitario de Concepción",
+     "Clasificatoria para la final nacional. Categorías individual, grupal y crossplay.", "PUBLICADO", "concurso"),
+    (6, 1, "Meetup Cosplay Valpo en el Parque Italia", "MEETUP", "VA", "Valparaíso", "Parque Italia",
+     "Encuentro abierto para sesión de fotos grupal. Trae agua y protector solar.", "PUBLICADO", "comunidad"),
+    (9, 1, "Taller de goma EVA para principiantes", "TALLER", "RM", "Santiago", "Biblioteca de Santiago",
+     "Taller gratuito: cortar, sellar y pintar tu primera pieza de armadura.", "PUBLICADO", "taller"),
+    (40, 3, "Expo Geek Norte", "CONVENCION", "AN", "Antofagasta", "Centro de Eventos de Antofagasta",
+     "La convención más grande del norte con concurso de cosplay y zona de artistas.", "PUBLICADO", "evento"),
+    (20, 1, "Meetup Cosplay Austral", "MEETUP", "MA", "Punta Arenas", "Costanera del Estrecho",
+     "Paseo cosplay por la costanera y café de camaradería.", "PUBLICADO", "comunidad"),
+    (16, 1, "Taller de maquillaje FX inclusivo", "TALLER", "CO", "La Serena", "Casa de la Cultura de La Serena",
+     "Maquillaje FX para todos los tonos de piel, con interpretación en lengua de señas.", "PUBLICADO", "taller"),
+    (55, 2, "Feria Otaku Temuco", "CONVENCION", "AR", "Temuco", "Gimnasio Municipal de Temuco",
+     "Feria de cultura asiática con escenario para cosplayers.", "PUBLICADO", "evento"),
+    (33, 1, "Concurso de Crossplay y Pasarela Diversa", "CONCURSO", "RM", "Providencia", "Centro Cultural de Providencia",
+     "Pasarela abierta a crossplay, cosplay adaptativo y de todas las tallas.", "PUBLICADO", "concurso"),
+    (24, 1, "Meetup Cosplay Adaptativo", "MEETUP", "RM", "Peñalolén", "Parque Peñalolén",
+     "Encuentro para compartir adaptaciones de trajes a sillas de ruedas y prótesis. Lugar 100% accesible.",
+     "PUBLICADO", "comunidad"),
+    (70, 2, "Convención Maule Fantástico", "CONVENCION", "ML", "Talca", "Centro de Extensión de Talca",
+     "Convención regional con concurso de cosplay infantil y adulto.", "PUBLICADO", "evento"),
+    (45, 1, "Taller de pelucas: estilizado básico", "TALLER", "VA", "Viña del Mar", "Centro Cultural de Viña del Mar",
+     "Aprende a cortar, peinar y fijar pelucas para cosplay.", "PUBLICADO", "taller"),
+    (-16, 1, "Meetup de Halloween Cosplay", "MEETUP", "RM", "Ñuñoa", "Plaza Ñuñoa",
+     "Meetup temático de Halloween (evento pasado).", "PUBLICADO", "comunidad"),
+    (30, 1, "Meetup Cosplay Chillán", "MEETUP", "NB", "Chillán", "Plaza de Armas de Chillán",
+     "Primer meetup de cosplay en Ñuble (sugerido por la comunidad).", "PENDIENTE", "comunidad"),
+]

@@ -1,131 +1,135 @@
-"""Configuración común de las pruebas.
+"""Infraestructura de pruebas.
 
-Las variables de entorno se fijan antes de importar la aplicación: `Settings`
-las lee al construirse y el Singleton las usa para crear el motor.
-
-Las pruebas corren sobre SQLite en un directorio temporal, con el esquema
-aplicado por la misma migración de Alembic que se usa en producción. Así se
-verifica el esquema real y no una copia hecha con `create_all`.
+- Usa TEST_DATABASE_URL (nunca la base de desarrollo).
+- Recrea el esquema con la migración real de Alembic una vez por corrida.
+- Vacía todas las tablas antes de cada prueba.
 """
-
-from __future__ import annotations
-
 import os
 import tempfile
-from pathlib import Path
 
-import pytest
+# Debe ocurrir ANTES de importar la app (get_settings queda en caché)
+from app.core.config import get_settings  # noqa: E402
 
-RAIZ = Path(__file__).resolve().parents[1]
+_s = get_settings()
+os.environ["DATABASE_URL"] = _s.test_database_url
+os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="cosplay-media-")
+get_settings.cache_clear()
 
-_DIR_TEMPORAL = Path(tempfile.mkdtemp(prefix="cosplay-test-"))
-_RUTA_BD = _DIR_TEMPORAL / "pruebas.db"
+import asyncio  # noqa: E402
+import uuid  # noqa: E402
 
-os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{_RUTA_BD.as_posix()}"
-os.environ["JWT_SECRET"] = "clave-de-prueba-con-mas-de-16-caracteres"
-os.environ["ENVIRONMENT"] = "test"
-os.environ["DB_ECHO"] = "false"
-# bcrypt con costo 12 tarda unos 250 ms por hash. En pruebas no aporta nada.
-os.environ["BCRYPT_ROUNDS"] = "4"
-# El adaptador local escribe en un directorio temporal de la sesión de pruebas.
-os.environ["STORAGE_DIRECTORIO"] = str(_DIR_TEMPORAL / "archivos")
+import pytest  # noqa: E402
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
 
-# Orden inverso de dependencias para poder borrar sin violar claves foráneas.
-TABLAS = [
-    # Primero las tablas del Observer: notificacion apunta a usuario.
-    "notificacion",
-    "bitacora_auditoria",
-    "foro_respuesta",
-    "foro_tema",
-    "desafio_mensual",
-    "participacion_evento",
-    "guia_tutorial",
-    "entrevista",
-    "articulo",
-    "contenido",
-    "categoria_contenido",
-    "perfil_cosplayer",
-    "evento_cosplay",
-    "proveedor",
-    "donde_comprar",
-    "comunidad_grupo",
-    "intento_login",
-    "usuario",
-]
+from app.core.config import BACKEND_DIR  # noqa: E402
+from app.core.security import hash_password  # noqa: E402
+from app.db.session_manager import DatabaseSessionManager  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models import CategoriaContenido, Perfil, Usuario  # noqa: E402
+from app.models.enums import EstadoUsuario, Region, Rol, TipoPerfil  # noqa: E402
+
+TEST_URL = get_settings().database_url
+assert "test" in TEST_URL, "Las pruebas solo pueden correr sobre una base de test"
+PASSWORD = "Clave2026segura"
+
+
+async def _reiniciar_esquema() -> None:
+    engine = create_async_engine(TEST_URL, poolclass=NullPool)
+    async with engine.begin() as conn:
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+    await engine.dispose()
 
 
 @pytest.fixture(scope="session", autouse=True)
-def esquema_aplicado():
-    """Aplica todas las migraciones una vez por sesión de pruebas."""
-    from alembic import command
-    from alembic.config import Config
-
-    cfg = Config(str(RAIZ / "alembic.ini"))
-    cfg.set_main_option("script_location", str(RAIZ / "migrations"))
-    cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+def esquema_bd():
+    asyncio.run(_reiniciar_esquema())
+    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    cfg.attributes["database_url"] = TEST_URL
     command.upgrade(cfg, "head")
     yield
 
 
-@pytest.fixture(autouse=True)
-def base_limpia(esquema_aplicado):
-    """Vacía las tablas antes de cada prueba."""
-    import sqlalchemy as sa
-
-    motor = sa.create_engine(os.environ["DATABASE_URL"])
-    with motor.begin() as conexion:
-        for tabla in TABLAS:
-            conexion.execute(sa.text(f"DELETE FROM {tabla}"))
-    motor.dispose()
-    yield
+@pytest.fixture(scope="session")
+async def gestor_bd(esquema_bd):
+    gestor = DatabaseSessionManager()
+    gestor.init(TEST_URL, poolclass=NullPool)
+    yield gestor
+    await gestor.close()
 
 
 @pytest.fixture(autouse=True)
-def infraestructura_limpia():
-    """Descarta el motor y la configuración entre pruebas."""
-    from app.core.config import get_settings
-    from app.core.database import DatabaseSessionManager
-
-    get_settings.cache_clear()
-    DatabaseSessionManager.reset()
+async def limpiar_tablas(gestor_bd):
+    async with gestor_bd.session() as s:
+        tablas = (await s.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> 'alembic_version'"
+        ))).scalars().all()
+        await s.execute(text(f"TRUNCATE {', '.join(tablas)} RESTART IDENTITY CASCADE"))
+        await s.commit()
     yield
-    DatabaseSessionManager.reset()
-    get_settings.cache_clear()
 
 
 @pytest.fixture
-def cliente():
-    from fastapi.testclient import TestClient
+async def db(gestor_bd):
+    async with gestor_bd.session() as s:
+        yield s
 
-    from app.main import app
 
-    with TestClient(app) as c:
+@pytest.fixture
+async def client(gestor_bd):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
 
+# ---------------------------------------------------------------- helpers
+async def crear_usuario(db, email: str, *, nombre: str = "Persona de prueba", rol: Rol = Rol.USUARIO,
+                        estado: EstadoUsuario = EstadoUsuario.ACTIVO,
+                        tipo: TipoPerfil = TipoPerfil.COSPLAYER, region: Region | None = Region.RM) -> Usuario:
+    u = Usuario(nombre=nombre, email=email, password_hash=hash_password(PASSWORD), rol=rol, estado=estado)
+    u.perfil = Perfil(tipo_perfil=tipo, region=region, redes_sociales=[], portafolio=[])
+    db.add(u)
+    await db.commit()
+    return u
+
+
+async def token_de(client, email: str) -> dict:
+    r = await client.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+async def crear_categoria(db, nombre: str = "Confección", slug: str = "confeccion") -> CategoriaContenido:
+    c = CategoriaContenido(nombre=nombre, slug=slug, descripcion="")
+    db.add(c)
+    await db.commit()
+    return c
+
+
 @pytest.fixture
-def datos_registro():
-    """Cuerpo válido de registro. Cada prueba lo modifica si lo necesita."""
-    from app.core.privacidad import VERSION
-
-    return {
-        "nombre": "Usuario de Prueba",
-        "correo": "usuario.prueba@ejemplo.cl",
-        "password": "Cosplay2026!",
-        "rol": "cosplayer",
-        "region": "Valparaíso",
-        "acepta_privacidad": True,
-        "consentimiento_version": VERSION,
-    }
+async def usuario(db):
+    return await crear_usuario(db, "camila@test.cl", nombre="Camila")
 
 
 @pytest.fixture
-def crear_usuario(cliente, datos_registro):
-    """Registra un usuario y devuelve (respuesta, cuerpo enviado)."""
+async def admin(db):
+    return await crear_usuario(db, "admin@test.cl", nombre="Moderación", rol=Rol.ADMIN)
 
-    def _crear(**sobrescrituras):
-        cuerpo = {**datos_registro, **sobrescrituras}
-        respuesta = cliente.post("/api/v1/auth/registro", json=cuerpo)
-        return respuesta, cuerpo
 
-    return _crear
+@pytest.fixture
+async def auth_usuario(client, usuario):
+    return await token_de(client, usuario.email)
+
+
+@pytest.fixture
+async def auth_admin(client, admin):
+    return await token_de(client, admin.email)
+
+
+def uid() -> str:
+    return str(uuid.uuid4())

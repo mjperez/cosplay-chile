@@ -1,38 +1,15 @@
-"""Modelos de datos. Importar aquí garantiza que Alembic vea todo el metadata."""
-
-from app.models.base import Base
-from app.models.comunidad import DesafioMensual, ForoRespuesta, ForoTema
-from app.models.contenido import (
-    Articulo,
-    CategoriaContenido,
-    Contenido,
-    Entrevista,
-    GuiaTutorial,
-)
-from app.models.directorio import ComunidadGrupo, DondeComprar, Proveedor
-from app.models.evento import EventoCosplay, ParticipacionEvento
-from app.models.intento_login import IntentoLogin
-from app.models.notificacion import BitacoraAuditoria, Notificacion
-from app.models.usuario import PerfilCosplayer, Usuario
+"""Importa todos los modelos para que queden registrados en Base.metadata (Alembic)."""
+from app.models.comunidad import DesafioMensual, Foro, ParticipacionDesafio, Respuesta, Tema
+from app.models.contenido import ArticuloTecnico, CategoriaContenido, Contenido, Entrevista, GuiaTutorial
+from app.models.directorio import ComunidadGrupo, DirectorioItem, ProveedorServicio, Resena, Tienda
+from app.models.evento import Evento, ParticipacionEvento
+from app.models.interaccion import Contacto, Favorito, Notificacion, RegistroAuditoria, Reporte
+from app.models.usuario import Perfil, TokenRecuperacion, Usuario
 
 __all__ = [
-    "Articulo",
-    "Base",
-    "BitacoraAuditoria",
-    "CategoriaContenido",
-    "ComunidadGrupo",
-    "Contenido",
-    "DesafioMensual",
-    "DondeComprar",
-    "Entrevista",
-    "EventoCosplay",
-    "ForoRespuesta",
-    "ForoTema",
-    "GuiaTutorial",
-    "IntentoLogin",
-    "Notificacion",
-    "ParticipacionEvento",
-    "PerfilCosplayer",
-    "Proveedor",
+    "ArticuloTecnico", "CategoriaContenido", "ComunidadGrupo", "Contacto", "Contenido",
+    "DesafioMensual", "DirectorioItem", "Entrevista", "Evento", "Favorito", "Foro", "GuiaTutorial",
+    "Notificacion", "ParticipacionDesafio", "ParticipacionEvento", "Perfil", "ProveedorServicio",
+    "RegistroAuditoria", "Reporte", "Resena", "Respuesta", "Tema", "Tienda", "TokenRecuperacion",
     "Usuario",
 ]

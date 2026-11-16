@@ -1,103 +1,186 @@
 @import "tailwindcss";
 
-/* ==========================================================================
-   Tokens del sistema de diseño (US-03)
-   --------------------------------------------------------------------------
-   Todo color, tipografía y radio que usa la interfaz sale de aquí. Un
-   componente no debe escribir un valor hexadecimal suelto: si hace falta un
-   color nuevo, se declara como token en este bloque.
-
-   Los contrastes están calculados contra blanco (#ffffff) para texto normal,
-   que es el mínimo AA de 4,5:1.
-   ========================================================================== */
-
+/*
+ * Tokens del diseño «Cosplay Chile — Frontend» (Claude Design), traducidos a Tailwind 4.
+ * Tema oscuro: los pares texto/fondo cumplen contraste AA (RNF-01, RNF-03).
+ */
 @theme {
-  /* Marca: violeta. 600 sobre blanco da 6,9:1 */
-  --color-marca-50: #f5f3ff;
-  --color-marca-100: #ede9fe;
-  --color-marca-200: #ddd6fe;
-  --color-marca-300: #c4b5fd;
-  --color-marca-400: #a78bfa;
-  --color-marca-500: #8b5cf6;
-  --color-marca-600: #6d28d9;
-  --color-marca-700: #5b21b6;
-  --color-marca-800: #4c1d95;
-  --color-marca-900: #2e1065;
+  --font-sans: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
 
-  /* Acento: ámbar. 700 sobre blanco da 5,0:1; se usa en texto, no 600 */
-  --color-acento-50: #fffbeb;
-  --color-acento-100: #fef3c7;
-  --color-acento-300: #fcd34d;
-  --color-acento-500: #f59e0b;
-  --color-acento-600: #d97706;
-  --color-acento-700: #b45309;
+  /* Fondos */
+  --color-noche: #0c0820;
+  --color-noche-2: #0d0924;
+  --color-indigo: #1a0d3c;
+  --color-ciruela: #2b1550;
+  --color-ciruela-2: #170c33;
+  --color-panel: #160c34;
 
-  /* Neutros con tinte cálido. Tinta 900 sobre blanco da 15,8:1 */
-  --color-tinta-50: #fafaf9;
-  --color-tinta-100: #f5f5f4;
-  --color-tinta-200: #e7e5e4;
-  --color-tinta-300: #d6d3d1;
-  --color-tinta-400: #a8a29e;
-  --color-tinta-500: #78716c;
-  --color-tinta-600: #57534e;
-  --color-tinta-700: #44403c;
-  --color-tinta-800: #292524;
-  --color-tinta-900: #1c1917;
+  /* Texto */
+  --color-tinta: #f6f1ff;
+  --color-lavanda: #c9bdea;
+  --color-niebla: #b3a6d6;
+  --color-durazno: #ffb3a8;
+  --color-rosado: #ffd9d2;
+  --color-tinta-oscura: #1a0716;
 
-  /* Semánticos */
-  --color-exito-100: #dcfce7;
-  --color-exito-600: #15803d;
-  --color-error-600: #b91c1c;
-  --color-error-50: #fef2f2;
+  /* Marca */
+  --color-coral: #ff7a6b;
+  --color-fucsia: #ff2fa0;
+  --color-violeta: #7a2cff;
+  --color-cian: #17e0ff;
+  --color-magenta: #c2456a;
+  --color-uva: #8d3a7c;
+  --color-turquesa: #12c4d4;
+  --color-estrella: #ffd166;
+  --color-peligro: #ff9b9b;
+  --color-exito: #8ef0b8;
 
-  /* Tipografía */
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Íconos de sección */
+  --color-icono-azul: #1e7bff;
+  --color-icono-morado: #8a5cc0;
+  --color-icono-coral: #ff6b6b;
 
-  /* Radios */
-  --radius-tarjeta: 0.875rem;
-  --radius-control: 0.5rem;
+  /* Niveles de guía */
+  --color-nivel-principiante: #2fe08a;
+  --color-nivel-intermedio: #ffd166;
+  --color-nivel-avanzado: #ff6fb5;
+
+  /* Tipos de evento */
+  --color-evento-convencion: #ff9ec4;
+  --color-evento-concurso: #ffd166;
+  --color-evento-meetup: #7cf0ff;
+  --color-evento-taller: #8ef0b8;
+
+  /* Radios y medidas */
+  --radius-panel: 18px;
+  --radius-campo: 10px;
+  --spacing-gutter: clamp(20px, 5vw, 72px);
+  --container-sitio: 1296px;
 }
 
-/* ==========================================================================
-   Base
-   ========================================================================== */
+/* Variables semánticas de los componentes compartidos (campos, paneles, enlaces y alertas) */
+:root {
+  color-scheme: dark;
+  --texto: #f6f1ff;
+  --texto-suave: #c9bdea;
+  --enlace: #ffb3a8;
+  --enlace-hover: #ffffff;
+  --superficie: rgba(255, 255, 255, 0.06);
+  --borde: rgba(255, 255, 255, 0.16);
+  --campo-fondo: rgba(10, 8, 32, 0.6);
+  --campo-borde: rgba(255, 255, 255, 0.32);
+  --contorno: rgba(255, 255, 255, 0.85);
+  --texto-contorno: #ffffff;
+  --error: #ff9b9b;
+  --estrella: #ffd166;
+  --foco: #17e0ff;
+}
 
-@layer base {
-  html {
-    scroll-behavior: smooth;
-  }
+html {
+  scroll-behavior: smooth;
+}
 
-  body {
-    @apply bg-tinta-50 text-tinta-900 antialiased;
-    font-family: var(--font-sans);
-  }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
 
-  /* Foco siempre visible y con contraste. Nunca se quita el outline sin
-     reemplazarlo: es requisito del criterio de accesibilidad de US-03. */
-  :focus-visible {
-    @apply outline-2 outline-offset-2 outline-marca-600;
-  }
+body {
+  @apply bg-noche font-sans text-tinta antialiased;
+}
 
-  /* Respeta a quien pidió menos movimiento en su sistema operativo. */
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
+::placeholder {
+  color: var(--color-niebla);
+  opacity: 1;
+}
+
+/* Foco siempre visible para navegación por teclado (RNF-03) */
+:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+/* Contenedores que reciben foco por programa (p. ej. <main> al cambiar de página) no muestran anillo */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
+select option {
+  background: #1a0d3c;
+  color: #f6f1ff;
+}
+
+@utility boton {
+  @apply inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xs px-[22px] py-3 text-center text-xs uppercase tracking-[.14em] no-underline transition disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@utility alerta {
+  @apply rounded-campo border px-4 py-3;
 }
 
 @layer components {
-  /* Enlace de salto para lectores de pantalla y navegación por teclado. */
-  .saltar-al-contenido {
-    @apply sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50
-           focus:rounded-control focus:bg-marca-700 focus:px-4 focus:py-2
-           focus:text-sm focus:font-semibold focus:text-white;
+  .contenedor { @apply mx-auto w-full max-w-sitio px-gutter; }
+
+  .boton-marca { @apply boton bg-linear-120 from-coral to-fucsia font-bold text-tinta-oscura hover:brightness-110; }
+  .boton-contorno {
+    @apply boton border font-medium hover:bg-white/10;
+    border-color: var(--contorno);
+    color: var(--texto-contorno);
   }
+  .boton-claro { @apply boton bg-white font-bold text-tinta-oscura hover:bg-rosado; }
+  .boton-peligro { @apply boton border border-peligro font-medium text-peligro hover:bg-peligro/10; }
+  .boton-grande { @apply px-[30px] py-[15px]; }
+  .boton-texto { @apply inline-flex min-h-11 items-center gap-2 px-1.5 text-xs font-bold uppercase tracking-[.12em] text-white hover:text-durazno; }
+  .boton-icono { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-white/40 text-white transition hover:border-coral hover:text-coral; }
+  .boton-icono[aria-pressed="true"] { @apply border-coral bg-coral text-tinta-oscura hover:text-tinta-oscura; }
+
+  .panel {
+    @apply rounded-panel border;
+    background: var(--superficie);
+    border-color: var(--borde);
+  }
+  .panel-solido { @apply border border-white/12 bg-panel/95; }
+
+  .sobretitulo { @apply text-xs font-bold uppercase tracking-[.2em] text-durazno; }
+  .titulo-seccion { @apply font-display text-[clamp(30px,3.4vw,46px)] leading-[1.12] font-bold text-white; }
+  .texto-suave { color: var(--texto-suave); }
+
+  .chip-filtro { @apply inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-white/30 bg-white/6 px-4 py-1 text-sm font-medium text-tinta transition hover:border-white/60; }
+  .chip-filtro[aria-pressed="true"], .chip-filtro[aria-current="true"] { @apply border-transparent bg-linear-120 from-coral to-fucsia font-bold text-tinta-oscura; }
+  .etiqueta { @apply inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/30 bg-white/6 px-3.5 py-1 text-[13px] text-tinta; }
+  .insignia { @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-bold tracking-[.04em]; }
+
+  .campo {
+    @apply mt-1.5 block min-h-11 w-full rounded-campo border px-3.5 py-2.5 text-base transition-colors;
+    background: var(--campo-fondo);
+    border-color: var(--campo-borde);
+    color: var(--texto);
+  }
+  .campo:focus { border-color: var(--color-coral); }
+  .campo[aria-invalid="true"] { border-color: var(--error); }
+  .rotulo { @apply block text-sm font-medium; color: var(--texto); }
+  .ayuda { @apply mt-1 text-sm; color: var(--texto-suave); }
+  .mensaje-error { @apply mt-1 text-sm font-medium; color: var(--error); }
+
+  .enlace-claro {
+    @apply underline decoration-1 underline-offset-[3px];
+    color: var(--enlace);
+  }
+  .enlace-claro:hover { color: var(--enlace-hover); }
+
+  .alerta-error { @apply alerta border-peligro/50 bg-peligro/10 text-[#ffd6d6]; }
+  .alerta-exito { @apply alerta border-exito/50 bg-exito/10 text-[#d8ffe8]; }
+  .alerta-info { @apply alerta border-cian/40 bg-cian/10 text-[#d6f8ff]; }
+  .alerta-aviso { @apply alerta border-estrella/50 bg-estrella/10 text-[#fff1cc]; }
+
+  .sr-only-focusable:not(:focus) {
+    @apply sr-only;
+  }
+
+  /* Texto largo con formato simple (TextoRico): párrafos, subtítulos y listas */
+  .prosa p { @apply mb-4 leading-relaxed; }
+  .prosa h2 { @apply mt-8 mb-3 font-display text-2xl font-bold text-white; }
+  .prosa ul { @apply mb-4 list-disc space-y-1 pl-6; }
+  .prosa ol { @apply mb-4 list-decimal space-y-1 pl-6; }
 }

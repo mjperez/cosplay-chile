@@ -1,13 +1,12 @@
 name: CI
 
-# Puerta de calidad del pipeline CI/CD. Cada push y cada PR ejecuta las
-# pruebas de backend con cobertura mínima y la compilación completa del
-# frontend. La "CD" la completa Render con `autoDeploy: true` sobre `main`
-# (ver render.yaml): si este workflow falla, no se mergea a `main` y el
-# servicio de producción no cambia.
+# Puerta de calidad del prototipo. Cada push y cada PR ejecuta:
+#   - backend: 96 pruebas pytest sobre PostgreSQL real + cobertura >= 90%
+#   - frontend: 59 pruebas de interfaz (Vitest) + compilación de producción
+# La "CD" la completa Render con autoDeploy sobre main (ver render.yaml).
 on:
   push:
-    branches: [main, dev, despliegue]
+    branches: [main, dev, integracion-diseno]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
@@ -26,12 +25,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13 es la versión de Render; 3.11 es la del entorno de desarrollo
-        # local. Probar ambas evita "funciona en mi máquina".
-        python: ["3.11", "3.13"]
+        python: ["3.12", "3.13"]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cosplay
+          POSTGRES_PASSWORD: cosplay
+          POSTGRES_DB: cosplay_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cosplay -d cosplay_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://cosplay:cosplay@localhost:5432/cosplay_test
+      TEST_DATABASE_URL: postgresql+asyncpg://cosplay:cosplay@localhost:5432/cosplay_test
+      JWT_SECRET: secreto-de-pruebas-con-mas-de-16-caracteres
+      FRONTEND_URL: http://localhost:5173
+      STORAGE_BACKEND: local
     steps:
       - name: Obtener el código
         uses: actions/checkout@v4
@@ -48,12 +65,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      # conftest.py fija DATABASE_URL (SQLite), JWT_SECRET, ENVIRONMENT=test,
-      # BCRYPT_ROUNDS=4 y STORAGE_DIRECTORIO antes de importar la aplicación.
-      # El esquema se crea con `alembic upgrade head`, el mismo de producción.
+      # conftest.py recrea el esquema con la misma migración de Alembic que
+      # producción y vacía las tablas antes de cada prueba. Nunca toca la base
+      # de desarrollo. coverage usa el núcleo sysmon (pyproject.toml) porque
+      # el trazador C pierde las líneas posteriores a un `await`.
       - name: Pruebas y cobertura
         run: >-
-          pytest
+          python -m pytest -q
           --cov=app
           --cov-report=term-missing
           --cov-report=xml
@@ -68,7 +86,7 @@ jobs:
           if-no-files-found: error
 
   frontend:
-    name: Frontend · lint y build
+    name: Frontend · pruebas y build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -87,8 +105,8 @@ jobs:
       - name: Instalar dependencias (reproducible)
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Pruebas de interfaz (Vitest)
+        run: npm test
 
       - name: Compilación de producción
         run: npm run build
@@ -112,4 +130,5 @@ jobs:
             echo "::error::La puerta de calidad no pasó. No se debe desplegar."
             exit 1
           fi
-          echo "Backend y frontend en verde. Render desplegará main automáticamente." >> "$GITHUB_STEP_SUMMARY"
+          echo "Backend (96 pruebas, >=90% cobertura) y frontend (59 pruebas + build) en verde." >> "$GITHUB_STEP_SUMMARY"
+          echo "Render desplegará main automáticamente." >> "$GITHUB_STEP_SUMMARY"

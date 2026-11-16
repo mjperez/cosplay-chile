@@ -1,90 +1,73 @@
-"""Esquemas de eventos y participaciones (US de calendario)."""
-
-from __future__ import annotations
-
 import uuid
-from datetime import datetime, timezone
-from typing import Literal
+from datetime import date, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, StringConstraints, model_validator
 
-TIPOS_EVENTO = ("convencion", "concurso", "feria", "taller", "otro")
-
-
-def _utc_naive(valor: datetime | None) -> datetime | None:
-    """Canonicaliza las fechas a UTC sin zona.
-
-    SQLite no conserva el offset y PostgreSQL interpreta un datetime naive en
-    la zona del servidor. Guardar siempre UTC naive evita que la misma hora se
-    lea distinta en pruebas y en producción.
-    """
-    if valor is None:
-        return None
-    if valor.tzinfo is not None:
-        return valor.astimezone(timezone.utc).replace(tzinfo=None)
-    return valor
+from app.models.enums import EstadoPublicacion, Region, TipoEvento
+from app.schemas.comun import AutorResumen, UrlExterna, UrlSegura
 
 
-class EventoEntrada(BaseModel):
-    nombre: str = Field(min_length=3, max_length=200)
-    tipo: Literal["convencion", "concurso", "feria", "taller", "otro"] = "convencion"
-    fecha_inicio: datetime
-    fecha_fin: datetime | None = None
-    lugar: str = Field(min_length=2, max_length=200)
-    region: str | None = Field(default=None, max_length=80)
-    enlace_oficial: str | None = Field(default=None, max_length=500)
+class EventoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    descripcion: str
+    tipo: TipoEvento
+    fecha_inicio: date
+    fecha_fin: date | None
+    lugar: str
+    comuna: str | None
+    region: Region
+    lat: float | None
+    lng: float | None
+    enlace_oficial: str | None
+    imagen_url: str | None
+    imagen_alt: str | None
+    estado: EstadoPublicacion
+    created_at: datetime
+    sugerido_por: AutorResumen | None = None
 
-    @field_validator("fecha_inicio", "fecha_fin")
     @classmethod
-    def normalizar_fecha(cls, valor: datetime | None) -> datetime | None:
-        return _utc_naive(valor)
+    def de(cls, e) -> "EventoOut":
+        return cls(
+            id=e.id, nombre=e.nombre, descripcion=e.descripcion, tipo=e.tipo, fecha_inicio=e.fecha_inicio,
+            fecha_fin=e.fecha_fin, lugar=e.lugar, comuna=e.comuna, region=e.region, lat=e.lat, lng=e.lng,
+            enlace_oficial=e.enlace_oficial, imagen_url=e.imagen_url, imagen_alt=e.imagen_alt, estado=e.estado,
+            created_at=e.created_at, sugerido_por=AutorResumen.de(e.creado_por),
+        )
+
+
+class EventoDetalle(EventoOut):
+    es_favorito: bool = False
+    asistire: bool = False
+    asistentes: int = 0
+
+
+class EventoSugerido(BaseModel):
+    """RF-17: los usuarios sugieren eventos; quedan pendientes de revisión."""
+    nombre: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=200)]
+    descripcion: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] = ""
+    tipo: TipoEvento
+    fecha_inicio: date
+    fecha_fin: date | None = None
+    lugar: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=200)]
+    comuna: Annotated[str, StringConstraints(strip_whitespace=True, max_length=80)] | None = None
+    region: Region
+    enlace_oficial: UrlExterna | None = None
+    imagen_url: UrlSegura | None = None
+    imagen_alt: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
 
     @model_validator(mode="after")
-    def validar_rango(self) -> "EventoEntrada":
-        if self.fecha_fin is not None and self.fecha_fin < self.fecha_inicio:
-            raise ValueError("la fecha de término no puede ser anterior al inicio")
+    def _fechas(self):
+        if self.fecha_inicio < date.today():
+            raise ValueError("La fecha de inicio no puede estar en el pasado")
+        if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError("La fecha de término no puede ser anterior a la de inicio")
+        if self.imagen_url and not self.imagen_alt:
+            raise ValueError("Toda imagen necesita un texto alternativo")
         return self
 
 
-class EventoPublico(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id_evento: uuid.UUID
-    nombre: str
-    tipo: str
-    fecha_inicio: datetime
-    fecha_fin: datetime | None = None
-    lugar: str
-    region: str | None = None
-    enlace_oficial: str | None = None
-    total_participantes: int = 0
-    creado_en: datetime
-
-
-class PaginaEventos(BaseModel):
-    total: int
-    limite: int
-    desplazamiento: int
-    elementos: list[EventoPublico]
-
-
-class ListaEventos(BaseModel):
-    total: int
-    elementos: list[EventoPublico]
-
-
-class ParticipacionEntrada(BaseModel):
-    personaje: str | None = Field(default=None, max_length=120)
-
-
-class ParticipacionPublica(BaseModel):
-    id_participacion: uuid.UUID
-    id_usuario: uuid.UUID
-    id_evento: uuid.UUID
-    personaje: str | None = None
-    nombre_usuario: str
-
-
-class PaginaParticipaciones(BaseModel):
-    total: int
-    elementos: list[ParticipacionPublica]
+class Asistencia(BaseModel):
+    asistire: bool
+    asistentes: int

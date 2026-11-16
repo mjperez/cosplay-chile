@@ -1,134 +1,120 @@
-"""Esquemas del contenido editorial.
-
-La entrada usa una unión discriminada por `tipo`: Pydantic elige el modelo
-según ese campo y devuelve 422 si no coincide con ninguno. Así el rechazo de un
-tipo desconocido no depende de un `if` escrito a mano en el endpoint.
-"""
-
-from __future__ import annotations
-
+import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal, Union
-from urllib.parse import urlparse
+from typing import Annotated
+from urllib.parse import parse_qs, urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
-# Dominios aceptados para el video. Se valida el host, no la cadena completa:
-# buscar "youtube.com" dentro de la URL daría por bueno "evil.com/?x=youtube.com".
-DOMINIOS_VIDEO = ("youtube.com", "youtu.be", "vimeo.com", "tiktok.com")
+from app.models.enums import EstadoPublicacion, Nivel, TipoContenido
+from app.schemas.comun import AutorResumen, ModeloOrm, TextoCorto, UrlSegura
 
-
-class Medida(BaseModel):
-    """Una medida del personaje o del traje, en pares parte/valor."""
-
-    parte: str = Field(min_length=1, max_length=40)
-    valor: str = Field(min_length=1, max_length=40)
+Item = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
 
 
-class ContenidoBase(BaseModel):
-    titulo: str = Field(min_length=3, max_length=200)
-    resumen: str | None = Field(default=None, max_length=500)
-    nivel: Literal["basico", "intermedio", "avanzado"] = "basico"
-    id_categoria: uuid.UUID | None = None
-    cuerpo: str | None = Field(default=None, max_length=20000)
-    imagenes: list[HttpUrl] | None = Field(default=None, max_length=10)
-    video_url: str | None = Field(default=None, max_length=500)
-
-    @field_validator("video_url")
-    @classmethod
-    def dominio_permitido(cls, valor: str | None) -> str | None:
-        if not valor:
-            return None
-        host = (urlparse(valor).hostname or "").lower()
-        if not host:
-            raise ValueError("la URL del video no es válida")
-        permitido = any(host == dominio or host.endswith(f".{dominio}") for dominio in DOMINIOS_VIDEO)
-        if not permitido:
-            raise ValueError(
-                "el video tiene que estar en " + ", ".join(DOMINIOS_VIDEO)
-            )
-        return valor
+def _validar_video(url: str) -> str:
+    """RF-18: solo video embebible de YouTube o Vimeo."""
+    if video_embed(url) is None:
+        raise ValueError("El video debe ser un enlace de YouTube o Vimeo")
+    return url
 
 
-class GuiaEntrada(ContenidoBase):
-    tipo: Literal["guia"]
-    personaje: str | None = Field(default=None, max_length=120)
-    medidas: list[Medida] | None = Field(default=None, max_length=20)
-    tecnicas: list[str] | None = Field(default=None, max_length=20)
-    presupuesto: str | None = Field(default=None, max_length=200)
-    seguridad: str | None = Field(default=None, max_length=2000)
-    pasos: list[str] | None = Field(default=None, max_length=40)
-    materiales: list[str] | None = Field(default=None, max_length=60)
+def video_embed(url: str | None) -> str | None:
+    if not url:
+        return None
+    p = urlparse(url)
+    host = (p.netloc or "").lower().removeprefix("www.").removeprefix("m.")
+    vid = None
+    if host == "youtu.be":
+        vid = p.path.strip("/")
+    elif host in ("youtube.com", "youtube-nocookie.com"):
+        vid = parse_qs(p.query).get("v", [None])[0] or (p.path.split("/embed/")[1] if "/embed/" in p.path else None)
+    if vid and re.fullmatch(r"[A-Za-z0-9_-]{6,20}", vid):
+        return f"https://www.youtube-nocookie.com/embed/{vid}"
+    if host == "vimeo.com" and re.fullmatch(r"/\d+", p.path or ""):
+        return f"https://player.vimeo.com/video{p.path}"
+    return None
 
 
-class EntrevistaEntrada(ContenidoBase):
-    tipo: Literal["entrevista"]
-    preguntas: list[str] | None = Field(default=None, max_length=30)
-    respuestas: list[str] | None = Field(default=None, max_length=30)
+class CategoriaOut(ModeloOrm):
+    id: uuid.UUID
+    nombre: str
+    slug: str
+    descripcion: str = ""
 
 
-class ArticuloEntrada(ContenidoBase):
-    tipo: Literal["articulo"]
-    enlaces: list[HttpUrl] | None = Field(default=None, max_length=20)
+class ContenidoCrear(BaseModel):
+    """Formulario de UC6: título, descripción, categoría y archivos multimedia."""
+    tipo: TipoContenido = TipoContenido.GUIA
+    titulo: TextoCorto
+    descripcion: Annotated[str, StringConstraints(strip_whitespace=True, min_length=10, max_length=500)]
+    cuerpo: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20000)] = ""
+    nivel: Nivel
+    categoria_id: str = Field(description="Id de una categoría existente")
+    imagen_url: UrlSegura | None = None
+    imagen_alt: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    video_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500), AfterValidator(_validar_video)] | None = None
+    # GuiaTutorial
+    pasos: list[Item] | None = Field(default=None, max_length=50)
+    materiales: list[Item] | None = Field(default=None, max_length=60)
+    # Entrevista
+    entrevistado: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+    preguntas: list[Item] | None = Field(default=None, max_length=40)
+    respuestas: list[Item] | None = Field(default=None, max_length=40)
+    # ArticuloTecnico
+    enlaces: list[Item] | None = Field(default=None, max_length=20)
 
 
-ContenidoEntrada = Annotated[
-    Union[GuiaEntrada, EntrevistaEntrada, ArticuloEntrada],
-    Field(discriminator="tipo"),
-]
-
-
-class ContenidoPublico(BaseModel):
-    """Vista plana: los campos que no aplican al tipo llegan en null."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id_contenido: uuid.UUID
-    tipo: str
+class ContenidoResumen(ModeloOrm):
+    id: uuid.UUID
+    tipo: TipoContenido
     titulo: str
-    resumen: str | None = None
-    nivel: str
-    estado: str
-    cuerpo: str | None = None
-    imagenes: list[str] | None = None
-    video_url: str | None = None
-    id_categoria: uuid.UUID | None = None
-    fecha_publicacion: datetime | None = None
-    creado_en: datetime
+    descripcion: str
+    nivel: Nivel
+    estado: EstadoPublicacion
+    categoria: CategoriaOut
+    autor: AutorResumen | None
+    imagen_url: str | None = None
+    imagen_alt: str | None = None
+    publicado_at: datetime | None = None
+    created_at: datetime
 
-    # Solo guía
-    personaje: str | None = None
-    medidas: list[dict] | None = None
-    tecnicas: list[str] | None = None
-    presupuesto: str | None = None
-    seguridad: str | None = None
+    @classmethod
+    def de(cls, c) -> "ContenidoResumen":
+        return cls(
+            id=c.id, tipo=c.tipo, titulo=c.titulo, descripcion=c.descripcion, nivel=c.nivel, estado=c.estado,
+            categoria=CategoriaOut.model_validate(c.categoria), autor=AutorResumen.de(c.autor),
+            imagen_url=c.imagen_url, imagen_alt=c.imagen_alt, publicado_at=c.publicado_at, created_at=c.created_at,
+        )
+
+
+class ContenidoDetalle(ContenidoResumen):
+    cuerpo: str = ""
+    video_url: str | None = None
+    video_embed: str | None = None
+    motivo_rechazo: str | None = None
     pasos: list[str] | None = None
     materiales: list[str] | None = None
-
-    # Solo entrevista
+    entrevistado: str | None = None
     preguntas: list[str] | None = None
     respuestas: list[str] | None = None
-
-    # Solo artículo
     enlaces: list[str] | None = None
+    es_favorito: bool = False
+
+    @classmethod
+    def de(cls, c, es_favorito: bool = False) -> "ContenidoDetalle":
+        base = ContenidoResumen.de(c).model_dump()
+        return cls(
+            **base, cuerpo=c.cuerpo or "", video_url=c.video_url, video_embed=video_embed(c.video_url),
+            motivo_rechazo=c.motivo_rechazo, pasos=c.pasos, materiales=c.materiales, entrevistado=c.entrevistado,
+            preguntas=c.preguntas, respuestas=c.respuestas, enlaces=c.enlaces, es_favorito=es_favorito,
+        )
 
 
-class PaginaContenido(BaseModel):
-    total: int
-    limite: int
-    desplazamiento: int
-    elementos: list[ContenidoPublico]
+class ContenidoCreado(BaseModel):
+    mensaje: str
+    contenido: ContenidoDetalle
 
 
-class CategoriaPublica(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id_categoria: uuid.UUID
-    nombre: str
-    descripcion: str | None = None
-
-
-class CategoriaEntrada(BaseModel):
-    nombre: str = Field(min_length=2, max_length=80)
-    descripcion: str | None = Field(default=None, max_length=500)
+class Rechazo(BaseModel):
+    motivo: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]

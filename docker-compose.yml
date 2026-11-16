@@ -1,0 +1,46 @@
+# Levanta todo el prototipo con:  docker compose up --build
+# Frontend: http://localhost:8080   API + OpenAPI: http://localhost:8000/docs
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cosplay
+      POSTGRES_PASSWORD: cosplay
+      POSTGRES_DB: cosplay
+    ports:
+      - "5433:5432"   # 5433 en el host para no chocar con un PostgreSQL local
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cosplay -d cosplay"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cosplay:cosplay@db:5432/cosplay
+      # Valor de desarrollo. En producción se define fuera del repositorio.
+      JWT_SECRET: ${JWT_SECRET:-solo-desarrollo-cambiar-en-produccion-3f8a1c}
+      FRONTEND_URL: http://localhost:8080
+      STORAGE_BACKEND: local
+      MEDIA_DIR: /app/media
+    ports:
+      - "8000:8000"
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  media:

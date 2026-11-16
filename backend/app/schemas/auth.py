@@ -1,91 +1,102 @@
-"""Esquemas de entrada y salida de autenticación."""
-
-from __future__ import annotations
-
+import re
 import uuid
-from datetime import datetime
-from typing import Literal
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 
-from app.core.privacidad import VERSION as VERSION_PRIVACIDAD
-from app.core.security import MAX_BYTES_PASSWORD
+from app.models.enums import EstadoUsuario, Region, Rol, TipoPerfil
+from app.schemas.comun import ImagenRef, ModeloOrm, RedSocial, UrlSegura
 
-# Roles que una persona puede asignarse al registrarse. `administrador` queda
-# fuera a propósito: si se aceptara desde el cuerpo de la petición, cualquiera
-# podría crearse una cuenta con permisos de administración.
-RolAutoasignable = Literal[
-    "visitante",
-    "cosplayer",
-    "cosmaker",
-    "sastre",
-    "tienda",
-    "fotografo",
-    "organizador",
-]
+Nombre = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=120)]
 
 
-class RegistroEntrada(BaseModel):
-    nombre: str = Field(min_length=2, max_length=120)
-    correo: EmailStr
-    password: str = Field(min_length=8, max_length=MAX_BYTES_PASSWORD)
-    rol: RolAutoasignable = "cosplayer"
-    region: str = Field(min_length=2, max_length=80)
+def _password_robusta(valor: str) -> str:
+    if len(valor) < 8:
+        raise ValueError("La contraseña debe tener al menos 8 caracteres")
+    if not re.search(r"[A-Za-zÁÉÍÓÚÑáéíóúñ]", valor) or not re.search(r"\d", valor):
+        raise ValueError("La contraseña debe combinar letras y números")
+    return valor
+
+
+class RegistroIn(BaseModel):
+    nombre: Nombre
+    email: EmailStr
+    password: str = Field(max_length=128)
+    tipo_perfil: TipoPerfil = TipoPerfil.COSPLAYER
+    region: Region | None = None
+    # RF-10: opt-in al directorio público (por defecto NO)
+    perfil_publico: bool = False
+    # RNF-11 / Ley 21.719: consentimiento explícito
     acepta_privacidad: bool
-    consentimiento_version: str = Field(min_length=1, max_length=20)
 
-    @field_validator("password")
-    @classmethod
-    def no_exceder_bytes(cls, valor: str) -> str:
-        if len(valor.encode("utf-8")) > MAX_BYTES_PASSWORD:
-            raise ValueError(f"la contraseña no puede superar los {MAX_BYTES_PASSWORD} bytes")
-        return valor
+    _v_password = field_validator("password")(_password_robusta)
 
     @field_validator("acepta_privacidad")
     @classmethod
-    def exigir_aceptacion(cls, valor: bool) -> bool:
+    def _consentimiento(cls, valor: bool) -> bool:
         if not valor:
-            raise ValueError("hay que aceptar la política de privacidad para crear la cuenta")
-        return valor
-
-    @field_validator("consentimiento_version")
-    @classmethod
-    def version_vigente(cls, valor: str) -> str:
-        if valor != VERSION_PRIVACIDAD:
-            raise ValueError(
-                f"la versión vigente de la política es {VERSION_PRIVACIDAD}, se recibió {valor}"
-            )
+            raise ValueError("Debes aceptar la política de privacidad para crear tu cuenta")
         return valor
 
 
-class LoginEntrada(BaseModel):
-    correo: EmailStr
-    password: str = Field(min_length=1, max_length=MAX_BYTES_PASSWORD)
+class LoginIn(BaseModel):
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=254)]
+    password: Annotated[str, StringConstraints(max_length=128)]
 
 
-class UsuarioPublico(BaseModel):
-    """Vista de un usuario sin datos sensibles."""
+class RecuperarIn(BaseModel):
+    email: EmailStr
 
-    model_config = ConfigDict(from_attributes=True)
 
-    id_usuario: uuid.UUID
+class RestablecerIn(BaseModel):
+    token: Annotated[str, StringConstraints(min_length=10, max_length=200)]
+    password: str = Field(max_length=128)
+
+    _v_password = field_validator("password")(_password_robusta)
+
+
+class PerfilOut(ModeloOrm):
+    tipo_perfil: TipoPerfil
+    biografia: str | None = None
+    region: Region | None = None
+    redes_sociales: list[RedSocial] = []
+    portafolio: list[ImagenRef] = []
+    especialidad: str | None = None
+    disponibilidad: str | None = None
+    avatar_url: str | None = None
+    perfil_publico: bool = False
+
+
+class UsuarioOut(ModeloOrm):
+    id: uuid.UUID
     nombre: str
-    correo: EmailStr
-    rol: str
-    region: str
-    activo: bool
-    creado_en: datetime
+    email: str
+    rol: Rol
+    estado: EstadoUsuario
+    perfil: PerfilOut | None = None
 
 
-class TokenRespuesta(BaseModel):
+class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    expires_in: int
-    usuario: UsuarioPublico
+    expira_en: int
+    usuario: UsuarioOut
 
 
-class PaginaUsuarios(BaseModel):
-    total: int
-    limite: int
-    desplazamiento: int
-    elementos: list[UsuarioPublico]
+class PerfilUpdate(BaseModel):
+    nombre: Nombre | None = None
+    tipo_perfil: TipoPerfil | None = None
+    biografia: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+    region: Region | None = None
+    redes_sociales: list[RedSocial] | None = Field(default=None, max_length=10)
+    portafolio: list[ImagenRef] | None = Field(default=None, max_length=20)
+    especialidad: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+    disponibilidad: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+    avatar_url: UrlSegura | None = None
+    perfil_publico: bool | None = None
+
+
+class PerfilPublicoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    perfil: PerfilOut

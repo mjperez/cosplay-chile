@@ -1,99 +1,78 @@
-"""Punto de entrada de la API.
-
-Arranque local:
-    uvicorn app.main:app --reload
-"""
-
-from __future__ import annotations
-
+"""Punto de entrada de la API REST de Cosplay Chile (FastAPI, documentación OpenAPI en /docs)."""
+import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import (
-    admin,
+from app.api.routers import (
     archivos,
     auth,
+    busqueda,
     comunidad,
-    contenido,
+    contacto,
+    contenidos,
     directorio,
     eventos,
-    health,
+    favoritos,
+    inicio,
+    meta,
+    moderacion,
     notificaciones,
-    perfiles,
-    proveedores,
+    perfil,
+    reportes,
 )
 from app.core.config import get_settings
-from app.core.database import get_session_manager
-from app.events.gestor import configurar_observadores
+from app.db.session_manager import DatabaseSessionManager
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+
+ROUTERS = [auth, perfil, meta, archivos, contacto, contenidos, favoritos, notificaciones, moderacion,
+           directorio, eventos, reportes, comunidad, inicio, busqueda]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Construye el motor una sola vez al arrancar. Si la configuración falta,
-    # el proceso falla aquí y no en la primera petición.
-    get_session_manager()
-    # Suscribe los tres observadores del patrón Observer (informe ES2).
-    configurar_observadores()
+    gestor_bd = DatabaseSessionManager()
+    gestor_bd.init(get_settings().database_url)  # no hace nada si ya fue inicializado (pruebas)
     yield
-    get_session_manager().dispose()
+    await gestor_bd.close()
 
 
 def crear_app() -> FastAPI:
-    settings = get_settings()
-
+    s = get_settings()
     app = FastAPI(
         title="Cosplay Chile API",
-        description="Plataforma de contenidos, directorio y comunidad para el cosplay chileno.",
-        version=health.VERSION,
-        docs_url="/docs",
-        openapi_url="/openapi.json",
+        version="0.1.0",
+        description="API REST del prototipo Cosplay Chile: guías, directorio, calendario y comunidad cosplay.",
         lifespan=lifespan,
     )
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=s.cors_origenes,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
-    # /health queda en la raíz porque Render la consulta sin prefijo.
-    app.include_router(health.router)
+    @app.middleware("http")
+    async def cabeceras_seguridad(request, call_next):  # RNF-06
+        respuesta = await call_next(request)
+        respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
+        respuesta.headers.setdefault("X-Frame-Options", "DENY")
+        respuesta.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        return respuesta
 
-    app.include_router(auth.router, prefix=settings.api_prefix)
-    app.include_router(auth.router_privacidad, prefix=settings.api_prefix)
-    app.include_router(admin.router, prefix=settings.api_prefix)
-    app.include_router(proveedores.router, prefix=settings.api_prefix)
-    app.include_router(contenido.router, prefix=settings.api_prefix)
-    app.include_router(eventos.router, prefix=settings.api_prefix)
-    app.include_router(comunidad.router_foro, prefix=settings.api_prefix)
-    app.include_router(comunidad.router_desafios, prefix=settings.api_prefix)
-    app.include_router(perfiles.router, prefix=settings.api_prefix)
-    app.include_router(directorio.router, prefix=settings.api_prefix)
-    app.include_router(notificaciones.router, prefix=settings.api_prefix)
-    app.include_router(archivos.router, prefix=settings.api_prefix)
+    for modulo in ROUTERS:
+        app.include_router(modulo.router)
 
-    # El adaptador local sirve las imágenes subidas. En producción se usa el
-    # adaptador de Cloudinary y este montaje queda vacío, sin romper nada.
-    directorio_archivos = Path(settings.storage_directorio)
-    directorio_archivos.mkdir(parents=True, exist_ok=True)
-    app.mount(
-        "/archivos", StaticFiles(directory=str(directorio_archivos)), name="archivos"
-    )
+    s.media_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=s.media_path), name="media")
 
-    @app.get("/", include_in_schema=False)
-    def raiz() -> dict:
-        return {
-            "servicio": settings.app_name,
-            "version": health.VERSION,
-            "documentacion": "/docs",
-            "salud": "/health",
-        }
+    @app.get("/api/salud", tags=["Sistema"])
+    async def salud():
+        return {"estado": "ok"}
 
     return app
 
